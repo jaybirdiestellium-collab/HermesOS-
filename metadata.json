@@ -1,0 +1,8 @@
+{
+  "name": "MansionOS - Hermes Patch",
+  "description": "A mythic-technical architecture representing sovereign creative inheritance, with wings for AI-powered chat, image generation, and text-to-speech, inspired by the Hermes lineage for signal processing and generative insights.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
