@@ -20,6 +20,8 @@ The `◬ Witness` tab in MansionOS is a compact, mobile-optimized panel that giv
 1. Make sure MansionOS is running on your desktop (`npm run dev`)
 2. Find your desktop's local IP address:
    - **Windows**: Open PowerShell → `ipconfig` → look for `IPv4 Address` (e.g. `192.168.1.42`)
+   - **macOS**: Open Terminal → `ipconfig getifaddr en0` (Wi-Fi) or check **System Settings → Wi-Fi → Details**
+   - **Linux**: Open Terminal → `ip addr show` → look for `inet` under your Wi-Fi interface (e.g. `wlan0`)
 3. On your phone's browser, go to: `http://192.168.1.42:3000`
 4. Tap the **◬ Witness** tab
 5. *(Optional)* Add to Home Screen for a native-app feel

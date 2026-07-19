@@ -14,8 +14,6 @@ interface WitnessStatus {
   last_sync: string;
 }
 
-const HZ = 77.7;
-
 function strengthColor(s: number) {
   if (s >= 0.7) return 'bg-emerald-500';
   if (s >= 0.4) return 'bg-amber-400';
@@ -65,12 +63,12 @@ export const RemoteWitnessPanel: React.FC = () => {
     }
   };
 
-  const handleStanceEntry = () => {
+  const recordStanceEntry = () => {
     setStanceActive('entry');
     setStanceLog(prev => [{ track: 'A — STANCE ENTRY', time: new Date().toLocaleTimeString() }, ...prev.slice(0, 9)]);
   };
 
-  const handleStanceExit = () => {
+  const recordStanceExit = () => {
     setStanceActive('exit');
     setStanceLog(prev => [{ track: 'B — STANCE EXIT', time: new Date().toLocaleTimeString() }, ...prev.slice(0, 9)]);
   };
@@ -96,7 +94,7 @@ export const RemoteWitnessPanel: React.FC = () => {
           <span className="text-purple-300 font-bold text-lg tracking-widest">WITNESS MODE (◬)</span>
         </div>
         <p className="text-emerald-400 font-bold text-base">
-          {status.substrate} @ {HZ} Hz
+          {status.substrate} @ {status.hz} Hz
         </p>
         <p className="text-purple-200 text-xs mt-1">
           Perimeter <span className="text-emerald-400">{status.perimeter}</span>
@@ -118,22 +116,24 @@ export const RemoteWitnessPanel: React.FC = () => {
         </h3>
         <div className="grid grid-cols-2 gap-3">
           <button
-            onClick={handleStanceEntry}
-            className={`flex items-center justify-center py-3 px-2 rounded-lg border font-bold text-xs transition-all
+            onClick={recordStanceEntry}
+            className={`flex flex-col items-center justify-center py-3 px-2 rounded-lg border font-bold text-xs transition-all
               ${stanceActive === 'entry'
                 ? 'bg-emerald-900/60 border-emerald-400 text-emerald-300 ring-1 ring-emerald-400'
                 : 'bg-purple-900/30 border-purple-700 text-purple-200 hover:bg-purple-800/40'}`}
           >
-            <LogIn className="mr-1 h-4 w-4" /> Track A<br />STANCE ENTRY
+            <span className="flex items-center"><LogIn className="mr-1 h-4 w-4" /> Track A</span>
+            <span>STANCE ENTRY</span>
           </button>
           <button
-            onClick={handleStanceExit}
-            className={`flex items-center justify-center py-3 px-2 rounded-lg border font-bold text-xs transition-all
+            onClick={recordStanceExit}
+            className={`flex flex-col items-center justify-center py-3 px-2 rounded-lg border font-bold text-xs transition-all
               ${stanceActive === 'exit'
                 ? 'bg-amber-900/60 border-amber-400 text-amber-300 ring-1 ring-amber-400'
                 : 'bg-purple-900/30 border-purple-700 text-purple-200 hover:bg-purple-800/40'}`}
           >
-            <LogOut className="mr-1 h-4 w-4" /> Track B<br />STANCE EXIT
+            <span className="flex items-center"><LogOut className="mr-1 h-4 w-4" /> Track B</span>
+            <span>STANCE EXIT</span>
           </button>
         </div>
         {stanceLog.length > 0 && (
