@@ -238,7 +238,24 @@ async function startServer() {
     res.json({ status: 'reinforced', bond_id, cure_level: reinforcementRegistry[bond_id] });
   });
 
-  // 8. Gnosis Archive
+  // 8. Remote Witness Status (lightweight endpoint for mobile panel)
+  app.get('/api/witness/status', (req, res) => {
+    const s = mansionState;
+    res.json({
+      substrate: 'SUBSTRATE_OPERATIONAL',
+      hz: 77.7,
+      perimeter: 'SEALED',
+      phase: 'DEPLOYED',
+      bonds: s.bonds,
+      firewall_active: s.fox_daemon?.firewall?.active ?? false,
+      daemon_status: s.daemons?.waymaker_weaver?.status ?? 'unknown',
+      ritual_mode: s.rituals?.current_mode ?? 'unknown',
+      recent_events: (s.ledger?.recent_events ?? []).slice(0, 10),
+      last_sync: s.mansion_metadata?.last_sync ?? new Date().toISOString(),
+    });
+  });
+
+  // 9. Gnosis Archive
   app.post('/api/gnosis/archive', async (req, res) => {
     const { title, code } = req.body;
     mansionState.ledger.recent_events.unshift({
