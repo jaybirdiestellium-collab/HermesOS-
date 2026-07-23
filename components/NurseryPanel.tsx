@@ -1,19 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, PlusCircle, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
-
-type NodeClearance = 'operator' | 'builder' | 'witness';
-type NodeStatus = 'active' | 'dormant' | 'suspended';
-
-interface MansionNode {
-  node_id: string;
-  name: string;
-  role: string;
-  clearance: NodeClearance;
-  status: NodeStatus;
-  tags: string[];
-  registered_at: string;
-  last_seen: string;
-}
+import { Users, PlusCircle, RefreshCw, CheckCircle } from 'lucide-react';
+import type { MansionNode, NodeClearance, NodeStatus } from '../types';
 
 interface NurseryData {
   nodes: Record<string, MansionNode>;

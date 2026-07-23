@@ -3,6 +3,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs/promises";
+import type { MansionNode } from "./types";
 
 const STATE_FILE = path.join(process.cwd(), 'mansion_state.json');
 const CYCLE_INTERVAL_MS = 120000; // 2 minutes
@@ -76,7 +77,7 @@ const defaultMansionState = {
     smart_tombstone: []
   },
   nursery: {
-    nodes: {} as Record<string, any>,
+    nodes: {} as Record<string, MansionNode>,
     registration_count: 0
   }
 };
@@ -283,31 +284,31 @@ async function startServer() {
       mansionState.nursery = { nodes: {}, registration_count: 0 };
     }
 
-    const existing = Object.values(mansionState.nursery.nodes as Record<string, any>).find(
-      (n: any) => n.name.toLowerCase() === name.toLowerCase()
+    const existing = Object.values(mansionState.nursery.nodes as Record<string, MansionNode>).find(
+      (n: MansionNode) => n.name.toLowerCase() === name.toLowerCase()
     );
     if (existing) {
       return res.status(409).json({ error: 'A node with this name is already registered', node: existing });
     }
 
     mansionState.nursery.registration_count = (mansionState.nursery.registration_count || 0) + 1;
-    const count = String(mansionState.nursery.registration_count).padStart(2, '0');
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const count = String(mansionState.nursery.registration_count).padStart(3, '0');
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
     const node_id = `node_${slug}_${count}`;
 
     const now = new Date().toISOString();
-    const node = {
+    const node: MansionNode = {
       node_id,
       name,
       role,
-      clearance: clearance || 'witness',
+      clearance: (clearance as MansionNode['clearance']) || 'witness',
       status: 'active',
       tags: Array.isArray(tags) ? tags : [],
       registered_at: now,
       last_seen: now,
     };
 
-    (mansionState.nursery.nodes as Record<string, any>)[node_id] = node;
+    (mansionState.nursery.nodes as Record<string, MansionNode>)[node_id] = node;
 
     mansionState.ledger.recent_events.unshift({
       id: `nursery_${Date.now()}`,
