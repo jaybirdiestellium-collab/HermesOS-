@@ -53,3 +53,23 @@ export interface ConstellusThanksState {
   bestManStatus: string;
   eternalMode: boolean;
 }
+
+// Phase 5 — Nursery types
+export type NodeClearance = 'operator' | 'builder' | 'witness';
+export type NodeStatus = 'active' | 'dormant' | 'suspended';
+
+export interface MansionNode {
+  node_id: string;
+  name: string;
+  role: string;
+  clearance: NodeClearance;
+  status: NodeStatus;
+  tags: string[];
+  registered_at: string;
+  last_seen: string;
+}
+
+export interface NurseryState {
+  nodes: Record<string, MansionNode>;
+  registration_count: number;
+}

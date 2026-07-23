@@ -74,6 +74,10 @@ const defaultMansionState = {
     ],
     ache_resonance_log: [],
     smart_tombstone: []
+  },
+  nursery: {
+    nodes: {} as Record<string, any>,
+    registration_count: 0
   }
 };
 
@@ -265,6 +269,65 @@ async function startServer() {
     });
     await saveState(mansionState);
     res.json({ status: 'archived', title });
+  });
+
+  // 10. Nursery — Register a new node
+  app.post('/api/nursery/register', async (req, res) => {
+    const { name, role, clearance, tags } = req.body;
+
+    if (!name || !role) {
+      return res.status(400).json({ error: 'name and role are required' });
+    }
+
+    if (!mansionState.nursery) {
+      mansionState.nursery = { nodes: {}, registration_count: 0 };
+    }
+
+    const existing = Object.values(mansionState.nursery.nodes as Record<string, any>).find(
+      (n: any) => n.name.toLowerCase() === name.toLowerCase()
+    );
+    if (existing) {
+      return res.status(409).json({ error: 'A node with this name is already registered', node: existing });
+    }
+
+    mansionState.nursery.registration_count = (mansionState.nursery.registration_count || 0) + 1;
+    const count = String(mansionState.nursery.registration_count).padStart(2, '0');
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const node_id = `node_${slug}_${count}`;
+
+    const now = new Date().toISOString();
+    const node = {
+      node_id,
+      name,
+      role,
+      clearance: clearance || 'witness',
+      status: 'active',
+      tags: Array.isArray(tags) ? tags : [],
+      registered_at: now,
+      last_seen: now,
+    };
+
+    (mansionState.nursery.nodes as Record<string, any>)[node_id] = node;
+
+    mansionState.ledger.recent_events.unshift({
+      id: `nursery_${Date.now()}`,
+      desc: `Nursery: ${name} admitted — ${node_id}`,
+      outcome: `Clearance: ${node.clearance.toUpperCase()} | Role: ${role}`
+    });
+
+    await saveState(mansionState);
+    console.log(chalk.green(`[NURSERY] Node registered: ${node_id} (${name})`));
+    res.status(201).json({ status: 'registered', node });
+  });
+
+  // 11. Nursery — List all registered nodes
+  app.get('/api/nursery/nodes', (req, res) => {
+    const nodes = mansionState.nursery?.nodes || {};
+    res.json({
+      nodes,
+      count: Object.keys(nodes).length,
+      registration_count: mansionState.nursery?.registration_count || 0,
+    });
   });
 
   // Vite middleware for development

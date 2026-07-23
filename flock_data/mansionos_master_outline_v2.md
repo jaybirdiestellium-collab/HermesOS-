@@ -66,7 +66,11 @@
 - IAM01 Stance Markers: Track A (Entry) / Track B (Exit)
 - Located: `components/RemoteWitnessPanel.tsx`
 
-<!-- ADD: any additional wings from local MansionOS build -->
+### 3.9 Nursery Panel
+- Agent / node registration and onboarding corridor
+- Issues `node_id` to any agent admitted through the Mansion
+- Registration form: name, role, clearance, tags
+- Located: `components/NurseryPanel.tsx`
 
 ---
 
@@ -149,6 +153,8 @@ Bond scoring:
 | POST | `/api/mortar/reinforce` | Reinforce a bond |
 | POST | `/api/gnosis/archive` | Archive gnosis concept |
 | GET | `/api/witness/status` | Lightweight mobile witness status |
+| POST | `/api/nursery/register` | Admit a new node — returns `node_id` |
+| GET | `/api/nursery/nodes` | List all registered Nursery nodes |
 
 ---
 
@@ -158,7 +164,7 @@ Bond scoring:
 - [x] Phase 2 — Fox Daemon + Bond monitoring
 - [x] Phase 3 — Waymaker-Weaver autonomous daemon
 - [x] Phase 4 — Remote Witness Mode (◬) — DEPLOYED
-- [ ] Phase 5 — <!-- fill in from local outline -->
+- [x] Phase 5 — Nursery: Node Registration Corridor — DEPLOYED
 - [ ] Phase 6 — <!-- fill in from local outline -->
 
 <!-- PASTE: full phase roadmap from local MansionOS Master Outline v2 here -->
