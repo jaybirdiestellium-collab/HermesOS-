@@ -1,11 +1,17 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import os from "os";
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs/promises";
 import type { MansionNode } from "./types";
 
 const STATE_FILE = path.join(process.cwd(), 'mansion_state.json');
+const CANONICAL_NODE_ID = /^node\.(substrate|agent|daemon|human|memory)\.[a-z0-9_]+$/;
+const COPILOT_NURSERY_LEDGERS = [
+  path.join(os.homedir(), '.mansion', 'HermesOS', 'flock_data', 'copilot_nursery_ledger.jsonl'),
+  path.join(os.homedir(), 'HermesOS', 'flock_data', 'copilot_nursery_ledger.jsonl'),
+];
 const CYCLE_INTERVAL_MS = 120000; // 2 minutes
 const RETRY_DELAY_MS = 30000; // 30s backoff on failure
 
@@ -101,6 +107,14 @@ async function saveState(state: any) {
   } catch (e: any) {
     console.error(chalk.red("[WEAVER] Failed to save state:"), e.message);
   }
+}
+
+async function appendCopilotNurseryLedger(packet: Record<string, unknown>) {
+  const line = `${JSON.stringify(packet)}\n`;
+  await Promise.all(COPILOT_NURSERY_LEDGERS.map(async ledgerPath => {
+    await fs.mkdir(path.dirname(ledgerPath), { recursive: true });
+    await fs.appendFile(ledgerPath, line, 'utf8');
+  }));
 }
 
 // --- REINFORCED MORTAR LOGIC ---
@@ -274,10 +288,15 @@ async function startServer() {
 
   // 10. Nursery — Register a new node
   app.post('/api/nursery/register', async (req, res) => {
-    const { name, role, clearance, tags } = req.body;
+    const { name, role, clearance, tags, node_id: requestedNodeId } = req.body;
 
     if (!name || !role) {
       return res.status(400).json({ error: 'name and role are required' });
+    }
+    if (requestedNodeId && !CANONICAL_NODE_ID.test(requestedNodeId)) {
+      return res.status(400).json({
+        error: 'node_id must match node.(substrate|agent|daemon|human|memory).<name>'
+      });
     }
 
     if (!mansionState.nursery) {
@@ -291,10 +310,14 @@ async function startServer() {
       return res.status(409).json({ error: 'A node with this name is already registered', node: existing });
     }
 
-    mansionState.nursery.registration_count = (mansionState.nursery.registration_count || 0) + 1;
-    const count = String(mansionState.nursery.registration_count).padStart(3, '0');
+    const nextRegistrationCount = (mansionState.nursery.registration_count || 0) + 1;
+    const count = String(nextRegistrationCount).padStart(3, '0');
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-    const node_id = `node_${slug}_${count}`;
+    const node_id = requestedNodeId || `node_${slug}_${count}`;
+    if (mansionState.nursery.nodes[node_id]) {
+      return res.status(409).json({ error: 'This node_id is already registered', node: mansionState.nursery.nodes[node_id] });
+    }
+    mansionState.nursery.registration_count = nextRegistrationCount;
 
     const now = new Date().toISOString();
     const node: MansionNode = {
@@ -307,6 +330,24 @@ async function startServer() {
       registered_at: now,
       last_seen: now,
     };
+
+    const executionMode = 'STRUCTURED_SCAFFOLDING';
+    const requiresL3Guardrail = node_id.startsWith('node.agent.copilot');
+    const initializationPacket = {
+      source_node: 'node.daemon.copilot_nursery',
+      routed_target: node_id,
+      execution_mode: executionMode,
+      requires_l3_guardrail: requiresL3Guardrail,
+      timestamp: now,
+      payload: {
+        action: 'NURSERY_NODE_INITIALIZATION',
+        status: 'INITIALIZING',
+        routed_target: node_id,
+        execution_mode: executionMode,
+        requires_l3_guardrail: requiresL3Guardrail,
+      },
+    };
+    await appendCopilotNurseryLedger(initializationPacket);
 
     (mansionState.nursery.nodes as Record<string, MansionNode>)[node_id] = node;
 

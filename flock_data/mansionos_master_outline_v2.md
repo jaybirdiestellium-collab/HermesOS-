@@ -153,8 +153,13 @@ Bond scoring:
 | POST | `/api/mortar/reinforce` | Reinforce a bond |
 | POST | `/api/gnosis/archive` | Archive gnosis concept |
 | GET | `/api/witness/status` | Lightweight mobile witness status |
-| POST | `/api/nursery/register` | Admit a new node — returns `node_id` |
+| POST | `/api/nursery/register` | Admit a node; optional canonical `node_id` must match the armored gateway namespace |
 | GET | `/api/nursery/nodes` | List all registered Nursery nodes |
+
+Copilot CLI registers as `node.agent.copilot_cli`. Its initialization packet uses
+`node.daemon.copilot_nursery` as the source, includes mirrored routing and L3
+guardrail metadata, and dual-writes `copilot_nursery_ledger.jsonl` under
+`~/.mansion/HermesOS/flock_data/` and `~/HermesOS/flock_data/`.
 
 ---
 
