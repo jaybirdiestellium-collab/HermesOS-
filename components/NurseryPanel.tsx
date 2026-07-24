@@ -29,6 +29,7 @@ export const NurseryPanel: React.FC = () => {
 
   const [form, setForm] = useState({
     name: '',
+    node_id: '',
     role: '',
     clearance: 'witness' as NodeClearance,
     tags: '',
@@ -64,12 +65,18 @@ export const NurseryPanel: React.FC = () => {
       const res = await fetch('/api/nursery/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name, role: form.role, clearance: form.clearance, tags }),
+        body: JSON.stringify({
+          name: form.name,
+          node_id: form.node_id || undefined,
+          role: form.role,
+          clearance: form.clearance,
+          tags,
+        }),
       });
       const d = await res.json();
       if (res.status === 201) {
         setFormResult({ ok: true, message: `✅ ${d.node.node_id} admitted to Nursery` });
-        setForm({ name: '', role: '', clearance: 'witness', tags: '' });
+        setForm({ name: '', node_id: '', role: '', clearance: 'witness', tags: '' });
         setShowForm(false);
         await fetchNodes();
       } else {
@@ -159,6 +166,17 @@ export const NurseryPanel: React.FC = () => {
                 value={form.role}
                 onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
                 placeholder="e.g. structured_builder"
+                className="w-full bg-purple-900/20 border border-purple-700 rounded px-3 py-2 text-purple-200 focus:outline-none focus:border-purple-400 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-purple-400 text-xs mb-1">Canonical Node ID</label>
+              <input
+                type="text"
+                value={form.node_id}
+                onChange={e => setForm(f => ({ ...f, node_id: e.target.value }))}
+                placeholder="e.g. node.agent.copilot_cli"
+                pattern="node\.(substrate|agent|daemon|human|memory)\.[a-z0-9_]+"
                 className="w-full bg-purple-900/20 border border-purple-700 rounded px-3 py-2 text-purple-200 focus:outline-none focus:border-purple-400 text-xs"
               />
             </div>
