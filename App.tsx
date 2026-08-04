@@ -34,9 +34,20 @@ function App() {
       const hasKey = await window.aistudio.hasSelectedApiKey();
       setApiKeySelected(hasKey);
     } else {
-      // Fallback if aistudio API is not available (e.g., local dev)
-      console.warn("window.aistudio not found. Assuming API key is set for development.");
-      setApiKeySelected(true);
+      // Outside AI Studio: check if the server has an API_KEY configured
+      try {
+        const res = await fetch('/api/witness/status');
+        if (res.ok) {
+          // Server is reachable and running — API key is available server-side
+          setApiKeySelected(true);
+        } else {
+          setApiKeySelected(false);
+        }
+      } catch {
+        // Server not reachable yet (cold start) — optimistically allow through
+        console.warn("Could not reach server for API key check. Allowing through for local dev.");
+        setApiKeySelected(true);
+      }
     }
     setLoadingApiKeyCheck(false);
   }, []);

@@ -1,9 +1,36 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Mic, MicOff } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { streamChatResponse } from '../services/geminiService';
 import { Button } from './common/Button';
 import { Loader } from './common/Loader';
 import { MAX_CHAT_MESSAGES } from '../constants';
+
+// Web Speech API types (not always available in all TS configs)
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+// Extend window for Web Speech API (not in all DOM type defs)
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognitionInstance;
+    webkitSpeechRecognition: new () => SpeechRecognitionInstance;
+  }
+}
+
+interface SpeechRecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  start(): void;
+  stop(): void;
+}
 
 export const ChatWing: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -12,7 +39,42 @@ export const ChatWing: React.FC = () => {
   const [inputMessage, setInputMessage] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [listening, setListening] = useState<boolean>(false);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const speechSupported = typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+  const toggleVoiceInput = useCallback(() => {
+    if (!speechSupported) return;
+
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const SpeechRecognitionClass = (window.SpeechRecognition || window.webkitSpeechRecognition) as new () => SpeechRecognitionInstance;
+    const recognition = new SpeechRecognitionClass();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => setListening(true);
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let transcript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setInputMessage(transcript);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  }, [listening, speechSupported]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -110,6 +172,20 @@ export const ChatWing: React.FC = () => {
           className="flex-grow p-3 rounded-lg bg-purple-800 bg-opacity-60 text-white placeholder-purple-300 border border-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
           disabled={loading}
         />
+        {speechSupported && (
+          <button
+            type="button"
+            onClick={toggleVoiceInput}
+            title={listening ? 'Stop listening' : 'Voice input'}
+            className={`p-3 rounded-lg border transition-all ${
+              listening
+                ? 'bg-red-900/60 border-red-500 text-red-300 animate-pulse'
+                : 'bg-purple-800/60 border-purple-700 text-purple-300 hover:bg-purple-700/60'
+            }`}
+          >
+            {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+          </button>
+        )}
         <Button type="submit" loading={loading} disabled={loading} className="min-w-[120px]">
           {loading ? 'Transmitting...' : 'Transmit'}
         </Button>

@@ -1,0 +1,23 @@
+{
+  "name": "MansionOS Witness",
+  "short_name": "Witness ◬",
+  "description": "MansionOS Remote Witness Mode — bond health, daemon status, stance markers",
+  "start_url": "/witness",
+  "display": "standalone",
+  "background_color": "#0f0e1e",
+  "theme_color": "#1e1b4b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://placehold.co/192x192/1e1b4b/c4b5fd?text=%E2%97%AC",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://placehold.co/512x512/1e1b4b/c4b5fd?text=%E2%97%AC",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

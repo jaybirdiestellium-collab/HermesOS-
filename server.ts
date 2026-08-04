@@ -4,6 +4,7 @@ import path from "path";
 import os from "os";
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs/promises";
+import crypto from "crypto";
 import type { MansionNode } from "./types";
 
 const STATE_FILE = path.join(process.cwd(), 'mansion_state.json');
@@ -147,6 +148,23 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Simple in-memory rate limiter for HTML-serving routes (dev only)
+  const htmlRateMap = new Map<string, { count: number; resetAt: number }>();
+  function htmlRateLimit(req: any, res: any, next: () => void) {
+    const ip = req.ip ?? 'unknown';
+    const now = Date.now();
+    const entry = htmlRateMap.get(ip);
+    if (!entry || now > entry.resetAt) {
+      htmlRateMap.set(ip, { count: 1, resetAt: now + 60_000 });
+      return next();
+    }
+    entry.count++;
+    if (entry.count > 120) { // 120 page loads/min is generous for a personal app
+      return res.status(429).set('Retry-After', '60').send('Too Many Requests');
+    }
+    next();
+  }
+
   // --- MANSION ORBIT RELAY API ---
   
   // 1. Read State (Mirroring)
@@ -216,7 +234,7 @@ async function startServer() {
       timestamp: new Date().toISOString(),
       message,
       feral_level: feral_level || 1,
-      hash: Math.random().toString(36).substring(2, 15) // Mock hash
+      hash: crypto.createHash('sha256').update(`${Date.now()}:${message}`).digest('hex').slice(0, 16),
     };
     mansionState.ledger.smart_tombstone.unshift(entry);
     await saveState(mansionState);
@@ -236,6 +254,9 @@ async function startServer() {
       type // soft vs hard
     };
     mansionState.ledger.ache_resonance_log.unshift(entry);
+    if (mansionState.ledger.ache_resonance_log.length > 50) {
+      mansionState.ledger.ache_resonance_log.pop();
+    }
     await saveState(mansionState);
     res.json({ status: 'logged', entry });
   });
@@ -372,17 +393,91 @@ async function startServer() {
     });
   });
 
-  // Vite middleware for development
+  // 12. Daemon kill switch toggle
+  app.post('/api/daemon/kill-switch', async (req, res) => {
+    const { daemon, state: killState } = req.body;
+    if (!daemon || !['open', 'closed'].includes(killState)) {
+      return res.status(400).json({ error: 'daemon and state (open|closed) are required' });
+    }
+    if (!mansionState.daemons?.[daemon as keyof typeof mansionState.daemons]) {
+      return res.status(404).json({ error: `Daemon '${daemon}' not found` });
+    }
+    (mansionState.daemons as any)[daemon].kill_switch.state = killState;
+    mansionState.ledger.recent_events.unshift({
+      id: `killswitch_${Date.now()}`,
+      desc: `Kill switch: ${daemon} set to ${killState.toUpperCase()}`,
+      outcome: killState === 'closed' ? 'Daemon paused' : 'Daemon resumed',
+    });
+    await saveState(mansionState);
+    res.json({ status: 'ok', daemon, kill_switch_state: killState });
+  });
+
+  // 13. Mutations — dismiss (remove by index)
+  app.post('/api/mutations/dismiss', async (req, res) => {
+    const { index } = req.body;
+    const mutations: any[] = mansionState.architecture?.pending_mutations ?? [];
+    if (typeof index !== 'number' || index < 0 || index >= mutations.length) {
+      return res.status(400).json({ error: 'Invalid mutation index' });
+    }
+    const removed = mutations.splice(index, 1)[0];
+    mansionState.ledger.recent_events.unshift({
+      id: `mutation_dismiss_${Date.now()}`,
+      desc: `Mutation dismissed: ${removed?.shift ?? 'unknown'}`,
+      outcome: 'Removed from pending queue',
+    });
+    await saveState(mansionState);
+    res.json({ status: 'dismissed', removed });
+  });
+
+  // 14. Mutations — approve (move to ledger and remove from pending)
+  app.post('/api/mutations/approve', async (req, res) => {
+    const { index } = req.body;
+    const mutations: any[] = mansionState.architecture?.pending_mutations ?? [];
+    if (typeof index !== 'number' || index < 0 || index >= mutations.length) {
+      return res.status(400).json({ error: 'Invalid mutation index' });
+    }
+    const approved = mutations.splice(index, 1)[0];
+    mansionState.ledger.recent_events.unshift({
+      id: `mutation_approve_${Date.now()}`,
+      desc: `Mutation approved: ${approved?.shift ?? 'unknown'}`,
+      outcome: 'Integrated into Mansion Architecture',
+    });
+    await saveState(mansionState);
+    res.json({ status: 'approved', mutation: approved });
+  });
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "spa",
+      appType: "custom",
     });
     app.use(vite.middlewares);
+    // /witness — serve witness.html (static path — not user-controlled)
+    app.get('/witness', htmlRateLimit, async (req, res, next) => {
+      try {
+        const htmlPath = path.join(process.cwd(), 'witness.html');
+        let html = await fs.readFile(htmlPath, 'utf8');
+        html = await vite.transformIndexHtml(req.originalUrl, html);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+      } catch (e) { next(e); }
+    });
+    // Fallback — serve main app (static path — not user-controlled)
+    app.get('*', htmlRateLimit, async (req, res, next) => {
+      try {
+        const htmlPath = path.join(process.cwd(), 'index.html');
+        let html = await fs.readFile(htmlPath, 'utf8');
+        html = await vite.transformIndexHtml(req.originalUrl, html);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+      } catch (e) { next(e); }
+    });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    // Static file serving — paths are hardcoded, not user-controlled
+    app.get('/witness', htmlRateLimit, (req, res) => {
+      res.sendFile(path.join(distPath, 'witness.html'));
+    });
+    app.get('*', htmlRateLimit, (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

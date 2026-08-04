@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Shield, Zap, RefreshCw, Activity } from 'lucide-react';
+import { Shield, Zap, RefreshCw, Activity, Power, CheckCircle, XCircle, GitBranch } from 'lucide-react';
 
 interface Bond {
   strength: number;
@@ -15,6 +15,12 @@ interface Alert {
   recent_weight_sum?: number;
   strength?: number;
   message?: string;
+}
+
+interface PendingMutation {
+  source: string;
+  shift: string;
+  timestamp: string;
 }
 
 interface MansionState {
@@ -32,12 +38,23 @@ interface MansionState {
   rituals: {
     current_mode: string;
   };
+  daemons: {
+    waymaker_weaver: {
+      status: string;
+      kill_switch: { command: string; state: 'open' | 'closed' };
+    };
+  };
+  architecture?: {
+    pending_mutations: PendingMutation[];
+  };
 }
 
 export const FoxDaemonDashboard: React.FC = () => {
   const [state, setState] = useState<MansionState | null>(null);
   const [loading, setLoading] = useState(true);
   const [grounding, setGrounding] = useState(false);
+  const [togglingDaemon, setTogglingDaemon] = useState(false);
+  const [dismissingMutations, setDismissingMutations] = useState<Set<number>>(new Set());
 
   const [syncPayload, setSyncPayload] = useState('{\n  "source": "Grok-1_Edge",\n  "suggestion": "Feral Spike Detected",\n  "payload": {\n    "feral_level": 8\n  }\n}');
   const [syncing, setSyncing] = useState(false);
@@ -73,6 +90,57 @@ export const FoxDaemonDashboard: React.FC = () => {
     }
   };
 
+  const handleToggleDaemon = async () => {
+    if (!state) return;
+    setTogglingDaemon(true);
+    try {
+      const currentState = state.daemons?.waymaker_weaver?.kill_switch?.state ?? 'open';
+      const newKillState = currentState === 'open' ? 'closed' : 'open';
+      await fetch('/api/daemon/kill-switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ daemon: 'waymaker_weaver', state: newKillState }),
+      });
+      await fetchState();
+    } catch (err) {
+      console.error("Kill switch toggle failed", err);
+    } finally {
+      setTogglingDaemon(false);
+    }
+  };
+
+  const handleDismissMutation = async (index: number) => {
+    setDismissingMutations(prev => new Set(prev).add(index));
+    try {
+      await fetch('/api/mutations/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ index }),
+      });
+      await fetchState();
+    } catch (err) {
+      console.error("Dismiss mutation failed", err);
+    } finally {
+      setDismissingMutations(prev => { const s = new Set(prev); s.delete(index); return s; });
+    }
+  };
+
+  const handleApproveMutation = async (index: number) => {
+    setDismissingMutations(prev => new Set(prev).add(index));
+    try {
+      await fetch('/api/mutations/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ index }),
+      });
+      await fetchState();
+    } catch (err) {
+      console.error("Approve mutation failed", err);
+    } finally {
+      setDismissingMutations(prev => { const s = new Set(prev); s.delete(index); return s; });
+    }
+  };
+
   const handleManualSync = async () => {
     setSyncing(true);
     setSyncResult(null);
@@ -105,9 +173,9 @@ export const FoxDaemonDashboard: React.FC = () => {
     );
   }
 
-  const bondData = Object.entries(state.bonds).map(([key, value]) => ({
+  const bondData = (Object.entries(state.bonds) as [string, Bond][]).map(([key, value]) => ({
     name: key.replace('_link', '').replace('_', ' ').toUpperCase(),
-    strength: value.strength,
+    strength: value.strength ?? 0,
   }));
 
   const overloadData = state.fox_daemon.alerts
@@ -128,14 +196,38 @@ export const FoxDaemonDashboard: React.FC = () => {
             Status: {state.mansion_metadata.status.toUpperCase()} | Ritual: {state.rituals.current_mode}
           </p>
         </div>
-        <button
-          onClick={handleGrounding}
-          disabled={grounding}
-          className="flex items-center px-4 py-2 bg-purple-900/50 hover:bg-purple-800/80 border border-purple-500 rounded-md transition-all disabled:opacity-50"
-        >
-          {grounding ? <RefreshCw className="animate-spin mr-2 h-4 w-4" /> : <Zap className="mr-2 h-4 w-4 text-yellow-400" />}
-          Trigger Grounding
-        </button>
+        <div className="flex items-center space-x-2">
+          {/* Waymaker-Weaver Kill Switch */}
+          {state.daemons?.waymaker_weaver && (() => {
+            const killState = state.daemons.waymaker_weaver.kill_switch?.state ?? 'open';
+            const isRunning = killState === 'open';
+            return (
+              <button
+                onClick={handleToggleDaemon}
+                disabled={togglingDaemon}
+                title={isRunning ? 'Pause Waymaker-Weaver' : 'Resume Waymaker-Weaver'}
+                className={`flex items-center px-3 py-2 border rounded-md transition-all disabled:opacity-50 text-sm ${
+                  isRunning
+                    ? 'bg-emerald-900/40 hover:bg-emerald-800/60 border-emerald-600 text-emerald-300'
+                    : 'bg-red-900/40 hover:bg-red-800/60 border-red-600 text-red-300'
+                }`}
+              >
+                {togglingDaemon
+                  ? <RefreshCw className="animate-spin mr-1 h-4 w-4" />
+                  : <Power className="mr-1 h-4 w-4" />}
+                Weaver: {isRunning ? 'RUNNING' : 'PAUSED'}
+              </button>
+            );
+          })()}
+          <button
+            onClick={handleGrounding}
+            disabled={grounding}
+            className="flex items-center px-4 py-2 bg-purple-900/50 hover:bg-purple-800/80 border border-purple-500 rounded-md transition-all disabled:opacity-50"
+          >
+            {grounding ? <RefreshCw className="animate-spin mr-2 h-4 w-4" /> : <Zap className="mr-2 h-4 w-4 text-yellow-400" />}
+            Trigger Grounding
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -258,6 +350,49 @@ export const FoxDaemonDashboard: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Pending Architectural Mutations */}
+        {(() => {
+          const mutations: PendingMutation[] = state.architecture?.pending_mutations ?? [];
+          return (
+            <div className="bg-black/40 border border-purple-900/50 p-4 rounded-lg mt-6">
+              <h3 className="text-lg text-purple-300 mb-3 flex items-center">
+                <GitBranch className="mr-2 h-4 w-4 text-amber-400" /> Pending Mutations
+                <span className="ml-2 text-xs text-purple-500">({mutations.length})</span>
+              </h3>
+              {mutations.length === 0 ? (
+                <p className="text-purple-500 text-sm">No pending mutations. Weaver is still scanning.</p>
+              ) : (
+                <ul className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                  {mutations.map((mut, idx) => (
+                    <li key={idx} className="p-3 bg-amber-900/10 border border-amber-900/40 rounded text-sm">
+                      <p className="text-amber-300 text-xs font-mono mb-1">
+                        {new Date(mut.timestamp).toLocaleString()} — <span className="text-purple-400">{mut.source}</span>
+                      </p>
+                      <p className="text-purple-200 text-xs">{mut.shift}</p>
+                      <div className="flex items-center space-x-2 mt-2">
+                        <button
+                          onClick={() => handleApproveMutation(idx)}
+                          disabled={dismissingMutations.has(idx)}
+                          className="flex items-center px-2 py-1 text-xs bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700 rounded text-emerald-300 transition-all disabled:opacity-50"
+                        >
+                          <CheckCircle className="mr-1 h-3 w-3" /> Approve
+                        </button>
+                        <button
+                          onClick={() => handleDismissMutation(idx)}
+                          disabled={dismissingMutations.has(idx)}
+                          className="flex items-center px-2 py-1 text-xs bg-red-900/30 hover:bg-red-900/50 border border-red-800 rounded text-red-300 transition-all disabled:opacity-50"
+                        >
+                          <XCircle className="mr-1 h-3 w-3" /> Dismiss
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   };
