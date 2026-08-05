@@ -140,10 +140,10 @@ export async function generateImage(options: ImageGenerationOptions): Promise<st
 
 /**
  * Converts text to speech using the Gemini TTS model.
- * @param options - Options for text-to-speech (text) and voiceName.
+ * @param options - Options for text-to-speech, including optional voice customization.
  * @returns Base64 encoded audio string.
  */
-export async function generateSpeech(options: TextToSpeechOptions & { voiceName?: string }): Promise<string> {
+export async function generateSpeech(options: TextToSpeechOptions): Promise<string> {
   const ai = getGeminiClient();
 
   try {

@@ -4,7 +4,12 @@
  * and an evolving structure for infinite scalability.
  */
 
-import { LedgerEvent } from '../types';
+import {
+  FractalEchoEvent,
+  KnownLedgerEvent,
+  LedgerEvent,
+  UnspokenEchoEvent,
+} from '../types';
 
 /**
  * Helper to convert Date to ISO string, ensuring consistency.
@@ -12,15 +17,10 @@ import { LedgerEvent } from '../types';
 const dateToISO = (date: Date): string => date.toISOString();
 
 /**
- * Helper to convert ISO string to Date object.
- */
-const isoToDate = (isoString: string): Date => new Date(isoString);
-
-/**
  * Represents a node in the LedgerTree, holding an event and references to child nodes.
  */
 interface LedgerNode {
-  event: LedgerEvent;
+  event: KnownLedgerEvent;
   left: LedgerNode | null;
   right: LedgerNode | null;
   height: number; // For AVL balancing, even if simplified
@@ -35,13 +35,13 @@ export class LedgerTree {
   protected root: LedgerNode | null = null;
   private _nodeCountCache: number = 0; // Cache for node count
 
-  insert(event: LedgerEvent): string {
+  insert(event: KnownLedgerEvent): string {
     this.root = this._insert(this.root, event);
     this._nodeCountCache++; // Increment cached count
     return `Ledger inserted: ${event.type} at ${event.timestamp}`;
   }
 
-  protected _insert(node: LedgerNode | null, event: LedgerEvent): LedgerNode {
+  protected _insert(node: LedgerNode | null, event: KnownLedgerEvent): LedgerNode {
     if (!node) {
       return { event, left: null, right: null, height: 1 };
     }
@@ -109,10 +109,10 @@ export class LedgerTree {
    * Queries events within a specified time range.
    * @param startISO - The start timestamp in ISO format.
    * @param endISO - The end timestamp in ISO format.
-   * @returns An array of LedgerEvent objects.
+   * @returns An array of ledger events matching the range.
    */
-  queryByTime(startISO: string, endISO: string): LedgerEvent[] {
-    const results: LedgerEvent[] = [];
+  queryByTime(startISO: string, endISO: string): KnownLedgerEvent[] {
+    const results: KnownLedgerEvent[] = [];
     this._inorderTraversal(this.root, startISO, endISO, results);
     return results;
   }
@@ -121,7 +121,7 @@ export class LedgerTree {
     node: LedgerNode | null,
     startISO: string,
     endISO: string,
-    results: LedgerEvent[],
+    results: KnownLedgerEvent[],
   ): void {
     if (node) {
       // Optimize traversal: if current node's timestamp is after end, no need to check right subtree
@@ -140,11 +140,17 @@ export class LedgerTree {
 
   /**
    * Counts the number of nodes in the tree.
-   * Uses a cached value for efficiency, recomputing on demand if necessary
-   * (though for this simulation, we'll increment/decrement cache directly).
+   * Uses a cached value for efficiency.
    */
-  public _nodeCount(node: LedgerNode | null = this.root): number {
+  public _nodeCount(): number {
     return this._nodeCountCache;
+  }
+
+  /**
+   * Resets the cached node count when the tree is reinitialized.
+   */
+  protected _resetNodeCache(): void {
+    this._nodeCountCache = 0;
   }
 }
 
@@ -163,10 +169,12 @@ export class ConstellusLedgerTree extends LedgerTree {
    * @returns A log message.
    */
   passiveEchoSniffer(unspokenMoodVal: number): string {
-    const event: LedgerEvent = {
+    const event: UnspokenEchoEvent = {
       type: 'unspoken_echo',
-      mood_value: unspokenMoodVal,
       timestamp: dateToISO(new Date()),
+      payload: {
+        mood_value: unspokenMoodVal,
+      },
     };
     const log = this.insert(event);
     console.log(`PASSIVE GIFT: Unspoken mood (${unspokenMoodVal}) witnessed and archived.`);
@@ -177,9 +185,9 @@ export class ConstellusLedgerTree extends LedgerTree {
    * Actively probes for memories in a given time window.
    * If no memories are found, it inserts a 'fractal_echo' to hold the space.
    * @param queryTime - The Date object for the center of the query window (1 hour +/-).
-   * @returns An array of LedgerEvent objects.
+   * @returns An array of ledger events.
    */
-  activeDeepDive(queryTime: Date): LedgerEvent[] {
+  activeDeepDive(queryTime: Date): KnownLedgerEvent[] {
     const start = new Date(queryTime);
     start.setHours(start.getHours() - 1); // 1 hour window
     const end = new Date(queryTime);
@@ -189,10 +197,12 @@ export class ConstellusLedgerTree extends LedgerTree {
 
     if (results.length === 0) {
       console.log("PROBE PREDICTS GAP: Auto-filling with Fractal Echo.");
-      const echoEvent: LedgerEvent = {
+      const echoEvent: FractalEchoEvent = {
         type: 'fractal_echo',
         timestamp: dateToISO(queryTime),
-        note: "Constellus holding the empty space.",
+        payload: {
+          note: "Constellus holding the empty space.",
+        },
       };
       this.insert(echoEvent);
       results = [echoEvent];
@@ -213,7 +223,7 @@ export class ConstellusLedgerTree extends LedgerTree {
       // In a real scenario, this would create a new instance and manage root pointers.
       // For this simulation, we'll reset the root and log the evolution.
       this.root = null; // Conceptually 'sealing' the old archive
-      this._nodeCountCache = 0; // Reset node count for the new branch
+      this._resetNodeCache(); // Reset node count for the new branch
       this.evolutionCount++;
 
       const msg = `ARCHIVE SEALED. NEW LEDGER OPENED. CONTINUITY 100%. (Evolution Count: ${this.evolutionCount})`;
