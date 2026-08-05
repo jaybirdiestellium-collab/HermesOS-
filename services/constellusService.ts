@@ -35,7 +35,7 @@ export class LedgerTree {
   protected root: LedgerNode | null = null;
   private _nodeCountCache: number = 0; // Cache for node count
 
-  insert<T extends KnownLedgerEvent>(event: T): string {
+  insert(event: KnownLedgerEvent): string {
     this.root = this._insert(this.root, event);
     this._nodeCountCache++; // Increment cached count
     return `Ledger inserted: ${event.type} at ${event.timestamp}`;

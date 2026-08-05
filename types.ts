@@ -159,11 +159,6 @@ export function isValidEvent(value: unknown): value is LedgerEvent {
 }
 
 /**
- * Runtime helper alias for validating ledger events.
- */
-export const IsValidEvent = isValidEvent;
-
-/**
  * Runtime guard for `unspoken_echo` ledger events.
  */
 export function isUnspokenEchoEvent(event: LedgerEvent): event is UnspokenEchoEvent {
