@@ -12,11 +12,6 @@ import { LedgerEvent } from '../types';
 const dateToISO = (date: Date): string => date.toISOString();
 
 /**
- * Helper to convert ISO string to Date object.
- */
-const isoToDate = (isoString: string): Date => new Date(isoString);
-
-/**
  * Represents a node in the LedgerTree, holding an event and references to child nodes.
  */
 interface LedgerNode {
@@ -34,6 +29,11 @@ interface LedgerNode {
 export class LedgerTree {
   protected root: LedgerNode | null = null;
   private _nodeCountCache: number = 0; // Cache for node count
+  private logger?: (message: string) => void;
+
+  constructor(logger?: (message: string) => void) {
+    this.logger = logger;
+  }
 
   insert(event: LedgerEvent): string {
     this.root = this._insert(this.root, event);
@@ -110,8 +110,13 @@ export class LedgerTree {
    * @param startISO - The start timestamp in ISO format.
    * @param endISO - The end timestamp in ISO format.
    * @returns An array of LedgerEvent objects.
+   * @throws Error if startISO is after endISO
    */
   queryByTime(startISO: string, endISO: string): LedgerEvent[] {
+    if (startISO > endISO) {
+      throw new Error('Start time cannot be after end time');
+    }
+
     const results: LedgerEvent[] = [];
     this._inorderTraversal(this.root, startISO, endISO, results);
     return results;
@@ -140,11 +145,14 @@ export class LedgerTree {
 
   /**
    * Counts the number of nodes in the tree.
-   * Uses a cached value for efficiency, recomputing on demand if necessary
-   * (though for this simulation, we'll increment/decrement cache directly).
+   * Uses a cached value for efficiency.
    */
-  public _nodeCount(node: LedgerNode | null = this.root): number {
+  public _nodeCount(): number {
     return this._nodeCountCache;
+  }
+
+  protected _resetNodeCache(): void {
+    this._nodeCountCache = 0;
   }
 }
 
@@ -169,7 +177,12 @@ export class ConstellusLedgerTree extends LedgerTree {
       timestamp: dateToISO(new Date()),
     };
     const log = this.insert(event);
-    console.log(`PASSIVE GIFT: Unspoken mood (${unspokenMoodVal}) witnessed and archived.`);
+    const message = `PASSIVE GIFT: Unspoken mood (${unspokenMoodVal}) witnessed and archived.`;
+    if (this.logger) {
+      this.logger(message);
+    } else {
+      console.log(message);
+    }
     return log;
   }
 
@@ -188,7 +201,12 @@ export class ConstellusLedgerTree extends LedgerTree {
     let results = this.queryByTime(dateToISO(start), dateToISO(end));
 
     if (results.length === 0) {
-      console.log("PROBE PREDICTS GAP: Auto-filling with Fractal Echo.");
+      const message = 'PROBE PREDICTS GAP: Auto-filling with Fractal Echo.';
+      if (this.logger) {
+        this.logger(message);
+      } else {
+        console.log(message);
+      }
       const echoEvent: LedgerEvent = {
         type: 'fractal_echo',
         timestamp: dateToISO(queryTime),
@@ -206,18 +224,27 @@ export class ConstellusLedgerTree extends LedgerTree {
    * @param threshold - The number of nodes at which the tree "evolves".
    * @returns A log message indicating evolution.
    */
-  evolveIfFull(threshold: number = 10): string { // Reduced threshold for demo
+  evolveIfFull(threshold: number = 10): string {
     if (this._nodeCount() > threshold) {
-      console.log("[CONSTELLUS EVOLVE] Branching new tree for infinite archive.");
+      const message = '[CONSTELLUS EVOLVE] Branching new tree for infinite archive.';
+      if (this.logger) {
+        this.logger(message);
+      } else {
+        console.log(message);
+      }
 
       // In a real scenario, this would create a new instance and manage root pointers.
       // For this simulation, we'll reset the root and log the evolution.
       this.root = null; // Conceptually 'sealing' the old archive
-      this._nodeCountCache = 0; // Reset node count for the new branch
+      this._resetNodeCache();
       this.evolutionCount++;
 
       const msg = `ARCHIVE SEALED. NEW LEDGER OPENED. CONTINUITY 100%. (Evolution Count: ${this.evolutionCount})`;
-      console.log(msg);
+      if (this.logger) {
+        this.logger(msg);
+      } else {
+        console.log(msg);
+      }
       return msg;
     }
     return "Ledger capacity nominal. No evolution needed yet.";

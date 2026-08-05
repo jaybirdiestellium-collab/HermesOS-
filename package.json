@@ -7,7 +7,8 @@
     "dev": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node server.ts"
+    "start": "node server.ts",
+    "test": "jest --coverage"
   },
   "dependencies": {
     "@google/genai": "^1.35.0",
@@ -21,8 +22,11 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.12",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
