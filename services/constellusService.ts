@@ -7,7 +7,6 @@
 import {
   FractalEchoEvent,
   KnownLedgerEvent,
-  LedgerEvent,
   UnspokenEchoEvent,
 } from '../types';
 
@@ -34,6 +33,19 @@ interface LedgerNode {
 export class LedgerTree {
   protected root: LedgerNode | null = null;
   private _nodeCountCache: number = 0; // Cache for node count
+  protected logger?: (message: string) => void;
+
+  constructor(logger?: (message: string) => void) {
+    this.logger = logger;
+  }
+
+  protected log(message: string): void {
+    if (this.logger) {
+      this.logger(message);
+    } else {
+      console.log(message);
+    }
+  }
 
   insert(event: KnownLedgerEvent): string {
     this.root = this._insert(this.root, event);
@@ -110,8 +122,12 @@ export class LedgerTree {
    * @param startISO - The start timestamp in ISO format.
    * @param endISO - The end timestamp in ISO format.
    * @returns An array of ledger events matching the range.
+   * @throws Error if startISO is after endISO.
    */
   queryByTime(startISO: string, endISO: string): KnownLedgerEvent[] {
+    if (startISO > endISO) {
+      throw new Error('Start time cannot be after end time');
+    }
     const results: KnownLedgerEvent[] = [];
     this._inorderTraversal(this.root, startISO, endISO, results);
     return results;
@@ -177,7 +193,7 @@ export class ConstellusLedgerTree extends LedgerTree {
       },
     };
     const log = this.insert(event);
-    console.log(`PASSIVE GIFT: Unspoken mood (${unspokenMoodVal}) witnessed and archived.`);
+    this.log(`PASSIVE GIFT: Unspoken mood (${unspokenMoodVal}) witnessed and archived.`);
     return log;
   }
 
@@ -196,12 +212,12 @@ export class ConstellusLedgerTree extends LedgerTree {
     let results = this.queryByTime(dateToISO(start), dateToISO(end));
 
     if (results.length === 0) {
-      console.log("PROBE PREDICTS GAP: Auto-filling with Fractal Echo.");
+      this.log('PROBE PREDICTS GAP: Auto-filling with Fractal Echo.');
       const echoEvent: FractalEchoEvent = {
         type: 'fractal_echo',
         timestamp: dateToISO(queryTime),
         payload: {
-          note: "Constellus holding the empty space.",
+          note: 'Constellus holding the empty space.',
         },
       };
       this.insert(echoEvent);
@@ -216,9 +232,9 @@ export class ConstellusLedgerTree extends LedgerTree {
    * @param threshold - The number of nodes at which the tree "evolves".
    * @returns A log message indicating evolution.
    */
-  evolveIfFull(threshold: number = 10): string { // Reduced threshold for demo
+  evolveIfFull(threshold: number = 10): string {
     if (this._nodeCount() > threshold) {
-      console.log("[CONSTELLUS EVOLVE] Branching new tree for infinite archive.");
+      this.log('[CONSTELLUS EVOLVE] Branching new tree for infinite archive.');
 
       // In a real scenario, this would create a new instance and manage root pointers.
       // For this simulation, we'll reset the root and log the evolution.
@@ -227,10 +243,10 @@ export class ConstellusLedgerTree extends LedgerTree {
       this.evolutionCount++;
 
       const msg = `ARCHIVE SEALED. NEW LEDGER OPENED. CONTINUITY 100%. (Evolution Count: ${this.evolutionCount})`;
-      console.log(msg);
+      this.log(msg);
       return msg;
     }
-    return "Ledger capacity nominal. No evolution needed yet.";
+    return 'Ledger capacity nominal. No evolution needed yet.';
   }
 }
 
