@@ -72,7 +72,7 @@ export const VoiceLibrary: React.FC = () => {
     stopCurrentAudio(); // Stop any currently playing audio (with fade-out)
 
     try {
-      const options: TextToSpeechOptions & { voiceName?: string } = {
+      const options: TextToSpeechOptions = {
         text: textInput,
         voiceName: selectedVoiceName,
       };

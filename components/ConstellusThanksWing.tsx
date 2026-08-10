@@ -1,7 +1,12 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Button } from './common/Button';
 import { Loader } from './common/Loader';
-import { ConstellusThanksState, LedgerEvent } from '../types';
+import {
+  ConstellusThanksState,
+  KnownLedgerEvent,
+  isFractalEchoEvent,
+  isUnspokenEchoEvent,
+} from '../types';
 import { ConstellusLedgerTree } from '../services/constellusService';
 
 // Initial state for ConstellusThanksCandy
@@ -27,7 +32,7 @@ export const ConstellusThanksWing: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [moodInput, setMoodInput] = useState<number>(0.5);
   const [queryDate, setQueryDate] = useState<string>(new Date().toISOString().slice(0, 16));
-  const [deepDiveResults, setDeepDiveResults] = useState<LedgerEvent[]>([]);
+  const [deepDiveResults, setDeepDiveResults] = useState<KnownLedgerEvent[]>([]);
   const [recentLedgerEvent, setRecentLedgerEvent] = useState<string | null>(null);
   const [lunchBreakMessage, setLunchBreakMessage] = useState<string | null>(null);
 
@@ -285,8 +290,12 @@ export const ConstellusThanksWing: React.FC = () => {
               <div key={index} className="bg-gray-800 bg-opacity-40 p-2 rounded-md text-sm">
                 <span className="font-mono text-gray-300">{event.timestamp.slice(11, 19)} - </span>
                 <span className="text-purple-200 font-semibold">{event.type}</span>
-                {event.mood_value !== undefined && <span className="text-purple-400"> (Mood: {event.mood_value.toFixed(2)})</span>}
-                {event.note && <span className="italic text-gray-400"> - {event.note}</span>}
+                {isUnspokenEchoEvent(event) && (
+                  <span className="text-purple-400"> (Mood: {event.payload.mood_value.toFixed(2)})</span>
+                )}
+                {isFractalEchoEvent(event) && (
+                  <span className="italic text-gray-400"> - {event.payload.note}</span>
+                )}
               </div>
             ))}
           </div>
