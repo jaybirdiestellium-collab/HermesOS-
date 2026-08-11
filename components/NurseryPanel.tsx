@@ -20,6 +20,26 @@ const STATUS_DOT: Record<NodeStatus, string> = {
   suspended: 'bg-red-500',
 };
 
+/** Returns Tailwind color classes based on how long ago last_seen was. */
+function getStaleLevel(lastSeen: string): 'fresh' | 'stale' | 'cold' {
+  const ageMs = Date.now() - new Date(lastSeen).getTime();
+  if (ageMs < 5 * 60 * 1000) return 'fresh';
+  if (ageMs < 60 * 60 * 1000) return 'stale';
+  return 'cold';
+}
+
+const STALE_DOT: Record<'fresh' | 'stale' | 'cold', string> = {
+  fresh: 'bg-emerald-400',
+  stale: 'bg-amber-400',
+  cold: 'bg-red-500',
+};
+
+const STALE_TEXT: Record<'fresh' | 'stale' | 'cold', string> = {
+  fresh: 'text-emerald-400',
+  stale: 'text-amber-400',
+  cold: 'text-red-400',
+};
+
 export const NurseryPanel: React.FC = () => {
   const [data, setData] = useState<NurseryData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -250,14 +270,16 @@ export const NurseryPanel: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {nodes.map(node => (
+          {nodes.map(node => {
+            const stale = getStaleLevel(node.last_seen);
+            return (
             <div
               key={node.node_id}
               className="bg-black/40 border border-purple-900/60 rounded-lg p-4 space-y-2"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[node.status] ?? 'bg-gray-500'}`} />
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${node.status !== 'active' ? STATUS_DOT[node.status] : STALE_DOT[stale]}`} />
                   <span className="text-purple-200 font-bold text-sm">{node.name}</span>
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded border font-bold uppercase ${CLEARANCE_COLORS[node.clearance] ?? 'text-gray-400'}`}>
@@ -278,7 +300,7 @@ export const NurseryPanel: React.FC = () => {
               <div className="border-t border-purple-900/40 pt-2 mt-1 space-y-1">
                 <p className="text-purple-500 text-xs">Admitted: {formatDate(node.registered_at)}</p>
                 <div className="flex items-center justify-between">
-                  <p className="text-purple-500 text-xs">Last seen: {formatDate(node.last_seen)}</p>
+                  <p className={`text-xs ${STALE_TEXT[stale]}`}>Last seen: {formatDate(node.last_seen)}</p>
                   <button
                     onClick={() => handleHeartbeat(node.node_id)}
                     disabled={pingingId === node.node_id}
@@ -293,7 +315,8 @@ export const NurseryPanel: React.FC = () => {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
