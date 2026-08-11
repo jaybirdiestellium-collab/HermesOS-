@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, PlusCircle, RefreshCw, CheckCircle } from 'lucide-react';
+import { Users, PlusCircle, RefreshCw, CheckCircle, Activity } from 'lucide-react';
 import type { MansionNode, NodeClearance, NodeStatus } from '../types';
 
 interface NurseryData {
@@ -24,6 +24,7 @@ export const NurseryPanel: React.FC = () => {
   const [data, setData] = useState<NurseryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
+  const [pingingId, setPingingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formResult, setFormResult] = useState<{ ok: boolean; message: string } | null>(null);
 
@@ -86,6 +87,18 @@ export const NurseryPanel: React.FC = () => {
       setFormResult({ ok: false, message: '❌ Registration failed — check server connection' });
     } finally {
       setRegistering(false);
+    }
+  };
+
+  const handleHeartbeat = async (node_id: string) => {
+    setPingingId(node_id);
+    try {
+      await fetch(`/api/nursery/nodes/${encodeURIComponent(node_id)}/heartbeat`, { method: 'PATCH' });
+      await fetchNodes();
+    } catch {
+      // silent on connection error
+    } finally {
+      setPingingId(null);
     }
   };
 
@@ -262,8 +275,22 @@ export const NurseryPanel: React.FC = () => {
                   ))}
                 </div>
               )}
-              <div className="border-t border-purple-900/40 pt-2 mt-1">
+              <div className="border-t border-purple-900/40 pt-2 mt-1 space-y-1">
                 <p className="text-purple-500 text-xs">Admitted: {formatDate(node.registered_at)}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-purple-500 text-xs">Last seen: {formatDate(node.last_seen)}</p>
+                  <button
+                    onClick={() => handleHeartbeat(node.node_id)}
+                    disabled={pingingId === node.node_id}
+                    className="flex items-center px-2 py-1 bg-purple-900/30 hover:bg-purple-800/60 border border-purple-700 rounded text-purple-300 text-xs transition-all disabled:opacity-50"
+                    title="Send heartbeat"
+                  >
+                    {pingingId === node.node_id
+                      ? <RefreshCw className="animate-spin h-3 w-3" />
+                      : <Activity className="h-3 w-3 mr-1" />}
+                    {pingingId === node.node_id ? '' : 'Ping'}
+                  </button>
+                </div>
               </div>
             </div>
           ))}

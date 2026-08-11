@@ -372,6 +372,23 @@ async function startServer() {
     });
   });
 
+  // 12. Nursery — Heartbeat (bump last_seen)
+  app.patch('/api/nursery/nodes/:id/heartbeat', async (req, res) => {
+    const node_id = req.params.id;
+    if (!mansionState.nursery?.nodes?.[node_id]) {
+      return res.status(404).json({ error: 'Node not found', node_id });
+    }
+    const now = new Date().toISOString();
+    (mansionState.nursery.nodes as Record<string, MansionNode>)[node_id].last_seen = now;
+    mansionState.ledger.recent_events.unshift({
+      id: `heartbeat_${Date.now()}`,
+      desc: `Heartbeat: ${node_id}`,
+      outcome: `last_seen updated at ${now}`,
+    });
+    await saveState(mansionState);
+    res.json({ status: 'ok', node_id, last_seen: now });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
