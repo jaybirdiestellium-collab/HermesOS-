@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Echo Lens</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 320px;
+      background: #1e1b4b;
+      color: #c4b5fd;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      padding: 16px;
+    }
+    h1 { color: #a78bfa; font-size: 14px; margin-bottom: 4px; }
+    .subtitle { color: #6d6a9c; font-size: 10px; margin-bottom: 16px; }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .label { color: #7c6ca8; }
+    .value { color: #e9d5ff; font-weight: bold; }
+    .badge { background: #312e81; border: 1px solid #4338ca; border-radius: 4px; padding: 2px 8px; }
+    .ok { color: #34d399; }
+    .warn { color: #fbbf24; }
+    hr { border: none; border-top: 1px solid #312e81; margin: 12px 0; }
+    label { display: block; color: #7c6ca8; margin-bottom: 4px; font-size: 10px; }
+    input {
+      width: 100%; background: #312e81; border: 1px solid #4338ca;
+      border-radius: 4px; padding: 6px 8px; color: #e9d5ff;
+      font-family: inherit; font-size: 11px; margin-bottom: 10px;
+      outline: none;
+    }
+    input:focus { border-color: #818cf8; }
+    button {
+      width: 100%; background: #4338ca; border: none; border-radius: 4px;
+      padding: 8px; color: #e9d5ff; font-family: inherit; font-size: 11px;
+      cursor: pointer; transition: background 0.2s;
+    }
+    button:hover { background: #3730a3; }
+    .tip { color: #6d6a9c; font-size: 10px; margin-top: 12px; line-height: 1.5; }
+    .tip code { color: #a78bfa; }
+  </style>
+</head>
+<body>
+  <h1>📡 Echo Lens</h1>
+  <p class="subtitle">MansionOS Signal Trail · Phase 6</p>
+
+  <div class="row">
+    <span class="label">Signals captured</span>
+    <span class="value badge" id="signalCount">—</span>
+  </div>
+  <div class="row">
+    <span class="label">Nursery node</span>
+    <span class="value" id="nurseryStatus">—</span>
+  </div>
+  <div class="row">
+    <span class="label">Node ID</span>
+    <span class="value" id="nodeId" style="font-size:10px;color:#6d6a9c;">—</span>
+  </div>
+
+  <hr />
+
+  <label for="mansionUrl">Mansion URL</label>
+  <input type="url" id="mansionUrl" placeholder="http://localhost:3000" />
+  <button id="saveBtn">Save Settings</button>
+  <div id="saveMsg" style="color:#34d399;font-size:10px;margin-top:6px;display:none;">✅ Saved</div>
+
+  <p class="tip">
+    Annotate any feed video with <code>Ledger_record:</code> followed by your note.<br/>
+    Echo Lens captures it and sends it to the Signal Mirror Wing automatically.
+  </p>
+
+  <script src="popup.js"></script>
+</body>
+</html>

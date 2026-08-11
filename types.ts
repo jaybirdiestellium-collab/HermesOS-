@@ -213,3 +213,31 @@ export interface NurseryState {
   nodes: Record<string, MansionNode>;
   registration_count: number;
 }
+
+/**
+ * Supported social/media platforms for signal trail entries.
+ */
+export type SignalPlatform = 'facebook' | 'youtube' | 'instagram' | 'tiktok' | 'twitter' | 'other';
+
+/**
+ * A single annotated content signal captured by the Echo Lens extension.
+ * Created when IAM01 posts a `Ledger_record:` comment on a feed video or content item.
+ */
+export interface SignalEntry {
+  /** Unique identifier for this signal entry. */
+  id: string;
+  /** The text following the `Ledger_record:` prefix (the operator's annotation). */
+  ledger_text: string;
+  /** Full URL of the content page where the annotation was made. */
+  source_url: string;
+  /** Social platform the signal originated from. */
+  platform: SignalPlatform;
+  /** ISO-8601 timestamp of when the signal was recorded. */
+  timestamp: string;
+  /** Inferred topic tags derived from ledger_text (e.g. ['zoology', 'daily-facts']). */
+  topic_tags: string[];
+  /** Optional creator name or channel hint extracted from the URL or page context. */
+  creator_hint?: string;
+  /** Nursery node_id of the Echo Lens instance that submitted this entry. */
+  node_id?: string;
+}

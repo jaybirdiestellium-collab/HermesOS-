@@ -10,6 +10,7 @@ import { ConstellusThanksWing } from './components/ConstellusThanksWing';
 import { FoxDaemonDashboard } from './components/FoxDaemonDashboard';
 import { RemoteWitnessPanel } from './components/RemoteWitnessPanel';
 import { NurseryPanel } from './components/NurseryPanel';
+import { SignalMirrorWing } from './components/SignalMirrorWing';
 import { Tab, Tabs, TabPanel } from './components/common/Tabs';
 
 enum ActiveWing {
@@ -22,6 +23,7 @@ enum ActiveWing {
   FoxDaemon = 'FoxDaemonDashboard',
   RemoteWitness = 'RemoteWitnessPanel',
   Nursery = 'NurseryPanel',
+  SignalMirror = 'SignalMirrorWing',
 }
 
 function App() {
@@ -78,6 +80,7 @@ function App() {
           <Tab tabId={ActiveWing.FoxDaemon}>Fox Daemon</Tab>
           <Tab tabId={ActiveWing.RemoteWitness}>◬ Witness</Tab>
           <Tab tabId={ActiveWing.Nursery}>🌱 Nursery</Tab>
+          <Tab tabId={ActiveWing.SignalMirror}>📡 Signal Mirror</Tab>
         </Tabs>
 
         <div className="mt-6 p-6 bg-purple-900 bg-opacity-30 backdrop-blur-sm rounded-lg shadow-xl border border-purple-700">
@@ -108,6 +111,9 @@ function App() {
           </TabPanel>
           <TabPanel tabId={ActiveWing.Nursery} activeTab={activeWing}>
             <NurseryPanel />
+          </TabPanel>
+          <TabPanel tabId={ActiveWing.SignalMirror} activeTab={activeWing}>
+            <SignalMirrorWing />
           </TabPanel>
         </div>
       </div>

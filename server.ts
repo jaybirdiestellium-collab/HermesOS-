@@ -4,7 +4,7 @@ import path from "path";
 import os from "os";
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs/promises";
-import type { MansionNode } from "./types";
+import type { MansionNode, SignalEntry } from "./types";
 
 const STATE_FILE = path.join(process.cwd(), 'mansion_state.json');
 const CANONICAL_NODE_ID = /^node\.(substrate|agent|daemon|human|memory)\.[a-z0-9_]+$/;
@@ -85,7 +85,8 @@ const defaultMansionState = {
   nursery: {
     nodes: {} as Record<string, MansionNode>,
     registration_count: 0
-  }
+  },
+  signal_trail: [] as SignalEntry[]
 };
 
 let mansionState: any = defaultMansionState;
@@ -370,6 +371,77 @@ async function startServer() {
       count: Object.keys(nodes).length,
       registration_count: mansionState.nursery?.registration_count || 0,
     });
+  });
+
+  // 12. Signal Trail — Ingest a Ledger_record annotation from Echo Lens
+  app.post('/api/signal/ingest', async (req, res) => {
+    const { ledger_text, source_url, platform, topic_tags, creator_hint, node_id } = req.body;
+
+    if (!ledger_text || typeof ledger_text !== 'string' || !ledger_text.trim()) {
+      return res.status(400).json({ error: 'ledger_text is required' });
+    }
+    if (!source_url || typeof source_url !== 'string') {
+      return res.status(400).json({ error: 'source_url is required' });
+    }
+
+    const VALID_PLATFORMS = ['facebook', 'youtube', 'instagram', 'tiktok', 'twitter', 'other'];
+    const resolvedPlatform = VALID_PLATFORMS.includes(platform) ? platform : 'other';
+
+    const entry: SignalEntry = {
+      id: `signal_${Date.now()}`,
+      ledger_text: ledger_text.trim(),
+      source_url,
+      platform: resolvedPlatform,
+      timestamp: new Date().toISOString(),
+      topic_tags: Array.isArray(topic_tags) ? topic_tags.filter((t: unknown) => typeof t === 'string') : [],
+      creator_hint: creator_hint || undefined,
+      node_id: node_id || undefined,
+    };
+
+    if (!mansionState.signal_trail) mansionState.signal_trail = [];
+    mansionState.signal_trail.unshift(entry);
+
+    // Cap trail at 500 entries
+    if (mansionState.signal_trail.length > 500) {
+      mansionState.signal_trail = mansionState.signal_trail.slice(0, 500);
+    }
+
+    // Emit to Gemini substrate ledger
+    mansionState.ledger.recent_events.unshift({
+      id: entry.id,
+      type: 'signal_trail',
+      desc: `Echo Lens: [${resolvedPlatform.toUpperCase()}] ${entry.ledger_text.slice(0, 80)}`,
+      outcome: `Source: ${source_url.slice(0, 100)}`,
+      timestamp: entry.timestamp,
+    });
+    if (mansionState.ledger.recent_events.length > 50) {
+      mansionState.ledger.recent_events.pop();
+    }
+
+    await saveState(mansionState);
+    console.log(chalk.cyan(`[ECHO_LENS] Signal ingested: ${entry.id} (${resolvedPlatform})`));
+    res.status(201).json({ status: 'ingested', entry });
+  });
+
+  // 13. Signal Trail — Retrieve trail with optional filters
+  app.get('/api/signal/trail', (req, res) => {
+    const { platform, tag, since } = req.query as Record<string, string | undefined>;
+    let trail: SignalEntry[] = mansionState.signal_trail || [];
+
+    if (platform) {
+      trail = trail.filter(e => e.platform === platform);
+    }
+    if (tag) {
+      trail = trail.filter(e => e.topic_tags.includes(tag));
+    }
+    if (since) {
+      const sinceDate = new Date(since).getTime();
+      if (!isNaN(sinceDate)) {
+        trail = trail.filter(e => new Date(e.timestamp).getTime() >= sinceDate);
+      }
+    }
+
+    res.json({ trail, count: trail.length });
   });
 
   // Vite middleware for development
