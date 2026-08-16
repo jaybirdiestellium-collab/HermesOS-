@@ -259,23 +259,35 @@ async function startServer() {
   // 7. Reinforce Mortar
   app.post('/api/mortar/reinforce', async (req, res) => {
     const { bond_id, memory_a, memory_b } = req.body;
-    if (reinforcementRegistry[bond_id]) {
-      reinforcementRegistry[bond_id] += 1;
-    } else {
-      reinforcementRegistry[bond_id] = 2;
+
+    if (!bond_id || typeof bond_id !== 'string') {
+      return res.status(400).json({ error: 'bond_id must be a non-empty string' });
     }
-    
-    if (mansionState.bonds[bond_id as keyof typeof mansionState.bonds]) {
-      mansionState.bonds[bond_id as keyof typeof mansionState.bonds].strength = Math.min(1.0, mansionState.bonds[bond_id as keyof typeof mansionState.bonds].strength + 0.02);
+
+    // Resolve the key from the object's OWN enumerable keys (Object.keys never
+    // includes __proto__ / constructor / prototype), breaking the user-input taint
+    // chain before we touch any property on the bonds object.
+    const resolvedBondId = Object.keys(mansionState.bonds).find(k => k === bond_id);
+    if (!resolvedBondId) {
+      return res.status(400).json({ error: 'bond_id must reference an existing bond' });
+    }
+
+    const bond = mansionState.bonds[resolvedBondId] as { strength: number };
+    bond.strength = Math.min(1.0, bond.strength + 0.02);
+
+    if (Object.prototype.hasOwnProperty.call(reinforcementRegistry, resolvedBondId)) {
+      reinforcementRegistry[resolvedBondId] += 1;
+    } else {
+      reinforcementRegistry[resolvedBondId] = 2;
     }
 
     // Run bond analysis if caller provides memory strings for Jaccard scoring
     const bond_analysis = (memory_a && memory_b)
-      ? calculateBond(bond_id, String(memory_a), String(memory_b))
+      ? calculateBond(resolvedBondId, String(memory_a), String(memory_b))
       : null;
     
     await saveState(mansionState);
-    res.json({ status: 'reinforced', bond_id, cure_level: reinforcementRegistry[bond_id], bond_analysis });
+    res.json({ status: 'reinforced', bond_id: resolvedBondId, cure_level: reinforcementRegistry[resolvedBondId], bond_analysis });
   });
 
   // 8. Remote Witness Status (lightweight endpoint for mobile panel)
@@ -495,8 +507,12 @@ No markdown, no extra text.`;
         // Prune oldest gnosis bonds when over the cap to prevent unbounded growth
         const gnosisBondKeys = Object.keys(mansionState.bonds).filter(k => k.startsWith('gnosis_'));
         if (gnosisBondKeys.length > MAX_GNOSIS_BONDS) {
-          // Keys are gnosis_<timestamp> — sort ascending and remove the oldest
-          gnosisBondKeys.sort();
+          // Sort by the numeric epoch suffix ascending so we remove the oldest first
+          gnosisBondKeys.sort((a, b) => {
+            const tsA = parseInt(a.slice('gnosis_'.length), 10) || 0;
+            const tsB = parseInt(b.slice('gnosis_'.length), 10) || 0;
+            return tsA - tsB;
+          });
           const toRemove = gnosisBondKeys.slice(0, gnosisBondKeys.length - MAX_GNOSIS_BONDS);
           for (const key of toRemove) {
             delete (mansionState.bonds as any)[key];
