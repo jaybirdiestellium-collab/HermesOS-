@@ -2,9 +2,11 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import os from "os";
+import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs/promises";
 import type { MansionNode } from "./types";
+import { GEMINI_WEAVER_MODEL } from "./constants";
 
 const STATE_FILE = path.join(process.cwd(), 'mansion_state.json');
 const CANONICAL_NODE_ID = /^node\.(substrate|agent|daemon|human|memory)\.[a-z0-9_]+$/;
@@ -14,6 +16,7 @@ const COPILOT_NURSERY_LEDGERS = [
 ];
 const CYCLE_INTERVAL_MS = 120000; // 2 minutes
 const RETRY_DELAY_MS = 30000; // 30s backoff on failure
+const MAX_GNOSIS_BONDS = 20; // cap on Weaver-generated gnosis bonds
 
 const chalk = {
   cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
@@ -85,16 +88,26 @@ const defaultMansionState = {
   nursery: {
     nodes: {} as Record<string, MansionNode>,
     registration_count: 0
-  }
+  },
+  reinforcement_registry: {} as Record<string, number>
 };
 
 let mansionState: any = defaultMansionState;
+
+// --- REINFORCED MORTAR LOGIC ---
+// Declared before loadState/saveState so both functions can reference it
+const reinforcementRegistry: Record<string, number> = {};
 
 async function loadState() {
   try {
     const data = await fs.readFile(STATE_FILE, 'utf8');
     console.log(chalk.green("[MANSION] Persistent state loaded from ledger."));
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    // Restore reinforcement registry from persisted state
+    if (parsed.reinforcement_registry && typeof parsed.reinforcement_registry === 'object') {
+      Object.assign(reinforcementRegistry, parsed.reinforcement_registry);
+    }
+    return parsed;
   } catch (e) {
     console.log(chalk.yellow("[MANSION] No state file found. Initializing fresh mortar."));
     return defaultMansionState;
@@ -103,6 +116,12 @@ async function loadState() {
 
 async function saveState(state: any) {
   try {
+    // Keep last_sync current on every write
+    if (state.mansion_metadata) {
+      state.mansion_metadata.last_sync = new Date().toISOString();
+    }
+    // Persist the in-memory reinforcement registry alongside state
+    state.reinforcement_registry = { ...reinforcementRegistry };
     await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2), 'utf8');
   } catch (e: any) {
     console.error(chalk.red("[WEAVER] Failed to save state:"), e.message);
@@ -116,9 +135,6 @@ async function appendCopilotNurseryLedger(packet: Record<string, unknown>) {
     await fs.appendFile(ledgerPath, line, 'utf8');
   }));
 }
-
-// --- REINFORCED MORTAR LOGIC ---
-const reinforcementRegistry: Record<string, number> = {};
 
 function calculateBond(memId: string, memoryA: string, memoryB: string) {
   const setA = new Set(memoryA.toLowerCase().split(/\s+/));
@@ -216,7 +232,7 @@ async function startServer() {
       timestamp: new Date().toISOString(),
       message,
       feral_level: feral_level || 1,
-      hash: Math.random().toString(36).substring(2, 15) // Mock hash
+      hash: crypto.createHash('sha256').update(`${message}|${Date.now()}`).digest('hex')
     };
     mansionState.ledger.smart_tombstone.unshift(entry);
     await saveState(mansionState);
@@ -242,7 +258,7 @@ async function startServer() {
 
   // 7. Reinforce Mortar
   app.post('/api/mortar/reinforce', async (req, res) => {
-    const { bond_id } = req.body;
+    const { bond_id, memory_a, memory_b } = req.body;
     if (reinforcementRegistry[bond_id]) {
       reinforcementRegistry[bond_id] += 1;
     } else {
@@ -252,9 +268,14 @@ async function startServer() {
     if (mansionState.bonds[bond_id as keyof typeof mansionState.bonds]) {
       mansionState.bonds[bond_id as keyof typeof mansionState.bonds].strength = Math.min(1.0, mansionState.bonds[bond_id as keyof typeof mansionState.bonds].strength + 0.02);
     }
+
+    // Run bond analysis if caller provides memory strings for Jaccard scoring
+    const bond_analysis = (memory_a && memory_b)
+      ? calculateBond(bond_id, String(memory_a), String(memory_b))
+      : null;
     
     await saveState(mansionState);
-    res.json({ status: 'reinforced', bond_id, cure_level: reinforcementRegistry[bond_id] });
+    res.json({ status: 'reinforced', bond_id, cure_level: reinforcementRegistry[bond_id], bond_analysis });
   });
 
   // 8. Remote Witness Status (lightweight endpoint for mobile panel)
@@ -428,7 +449,7 @@ async function runWaymakerWeaverDaemon() {
 No markdown, no extra text.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview',
+        model: GEMINI_WEAVER_MODEL,
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
@@ -470,6 +491,18 @@ No markdown, no extra text.`;
           shift: concept.architectural_shift,
           timestamp: new Date().toISOString()
         };
+
+        // Prune oldest gnosis bonds when over the cap to prevent unbounded growth
+        const gnosisBondKeys = Object.keys(mansionState.bonds).filter(k => k.startsWith('gnosis_'));
+        if (gnosisBondKeys.length > MAX_GNOSIS_BONDS) {
+          // Keys are gnosis_<timestamp> — sort ascending and remove the oldest
+          gnosisBondKeys.sort();
+          const toRemove = gnosisBondKeys.slice(0, gnosisBondKeys.length - MAX_GNOSIS_BONDS);
+          for (const key of toRemove) {
+            delete (mansionState.bonds as any)[key];
+          }
+          console.log(chalk.gray(`[WEAVER] Pruned ${toRemove.length} stale gnosis bond(s). Cap: ${MAX_GNOSIS_BONDS}`));
+        }
       }
 
       // 3. Inject into Ledger

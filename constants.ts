@@ -5,6 +5,8 @@
 export const GEMINI_CHAT_MODEL = 'gemini-3-pro-preview';
 export const GEMINI_IMAGE_MODEL = 'gemini-3-pro-image-preview';
 export const GEMINI_TTS_MODEL = 'gemini-2.5-flash-preview-tts';
+// Model used by the Waymaker-Weaver server-side daemon
+export const GEMINI_WEAVER_MODEL = 'gemini-3.1-pro-preview';
 
 export const AI_STUDIO_BILLING_URL = 'https://ai.google.dev/gemini-api/docs/billing';
 

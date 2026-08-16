@@ -23,6 +23,7 @@ const STATUS_DOT: Record<NodeStatus, string> = {
 export const NurseryPanel: React.FC = () => {
   const [data, setData] = useState<NurseryData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [registering, setRegistering] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [formResult, setFormResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -40,8 +41,9 @@ export const NurseryPanel: React.FC = () => {
       const res = await fetch('/api/nursery/nodes');
       const d = await res.json();
       setData(d);
+      setFetchError(null);
     } catch {
-      // silent on connection error
+      setFetchError('⚠️ Cannot reach server — nursery data unavailable');
     } finally {
       setLoading(false);
     }
@@ -109,6 +111,13 @@ export const NurseryPanel: React.FC = () => {
 
   return (
     <div className="flex flex-col space-y-6 font-mono text-sm">
+
+      {/* ── CONNECTION ERROR BANNER ── */}
+      {fetchError && (
+        <div className="text-xs px-4 py-2 rounded border text-amber-400 border-amber-800 bg-amber-900/20">
+          {fetchError}
+        </div>
+      )}
 
       {/* ── HEADER ── */}
       <div className="flex items-center justify-between border-b border-purple-800 pb-4">
