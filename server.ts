@@ -104,8 +104,100 @@ async function loadState() {
 async function saveState(state: any) {
   try {
     await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2), 'utf8');
+    await writeHandoff(state);
   } catch (e: any) {
     console.error(chalk.red("[WEAVER] Failed to save state:"), e.message);
+  }
+}
+
+const HANDOFF_FILE = path.join(process.cwd(), 'flock_data', 'copilot_handoff_latest.md');
+
+async function writeHandoff(state: any) {
+  try {
+    const nodes: MansionNode[] = Object.values(state.nursery?.nodes ?? {}) as MansionNode[];
+    const nodeRows = nodes.length
+      ? nodes.map((n: MansionNode) =>
+          `| ${n.node_id} | ${n.name} | ${n.clearance} | ${n.status} | ${n.last_seen} |`
+        ).join('\n')
+      : '| — | No nodes registered | — | — | — |';
+
+    const bonds = state.bonds ?? {};
+    const bondRows = Object.entries(bonds)
+      .map(([id, b]: [string, any]) => `| ${id} | ${b.strength ?? '—'} | ${b.status ?? '—'} |`)
+      .join('\n');
+
+    const daemon = state.daemons?.waymaker_weaver;
+    const daemonStatus = daemon?.status ?? 'unknown';
+    const killSwitch = daemon?.kill_switch?.state ?? 'unknown';
+
+    const mutations: any[] = state.architecture?.pending_mutations ?? [];
+    const mutationList = mutations.length
+      ? mutations.map((m: any) => `- ${JSON.stringify(m)}`).join('\n')
+      : '- None';
+
+    const events: any[] = state.ledger?.recent_events ?? [];
+    const recentList = events.slice(0, 5)
+      .map((e: any) => `- **${e.desc}** — ${e.outcome}`)
+      .join('\n') || '- None';
+
+    const content = `# Copilot Handoff — Latest
+
+> **Auto-generated**: ${new Date().toISOString()}
+> **Mansion version**: ${state.mansion_metadata?.version ?? '—'} · ${state.mansion_metadata?.codename ?? '—'}
+> **Mansion status**: ${state.mansion_metadata?.status ?? '—'}
+
+---
+
+## Daemon
+
+| Daemon | Status | Kill Switch |
+|---|---|---|
+| Waymaker-Weaver | ${daemonStatus} | ${killSwitch} |
+
+---
+
+## Nursery Nodes
+
+| node_id | name | clearance | status | last_seen |
+|---|---|---|---|---|
+${nodeRows}
+
+---
+
+## Active Bonds
+
+| Bond | Strength | Status |
+|---|---|---|
+${bondRows}
+
+---
+
+## Recent Ledger Events
+
+${recentList}
+
+---
+
+## Pending Architectural Mutations
+
+${mutationList}
+
+---
+
+## Next Session Priority
+
+<!-- What to pick up first — update manually after each session -->
+
+---
+
+## Cross-Agent Notes
+
+<!-- Anything Grok needs to know / anything Copilot flagged -->
+`;
+
+    await fs.writeFile(HANDOFF_FILE, content, 'utf8');
+  } catch (e: any) {
+    console.error(chalk.red("[MANSION] Failed to write handoff file:"), e.message);
   }
 }
 
@@ -387,6 +479,30 @@ async function startServer() {
     });
     await saveState(mansionState);
     res.json({ status: 'ok', node_id, last_seen: now });
+  });
+
+  // 13. Nursery — Update node status (active / dormant / suspended)
+  app.patch('/api/nursery/nodes/:id/status', async (req, res) => {
+    const node_id = req.params.id;
+    const { status } = req.body;
+    const VALID_STATUSES = ['active', 'dormant', 'suspended'];
+    if (!VALID_STATUSES.includes(status)) {
+      return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
+    }
+    if (!mansionState.nursery?.nodes?.[node_id]) {
+      return res.status(404).json({ error: 'Node not found', node_id });
+    }
+    const node = (mansionState.nursery.nodes as Record<string, MansionNode>)[node_id];
+    const previous = node.status;
+    node.status = status;
+    mansionState.ledger.recent_events.unshift({
+      id: `status_${Date.now()}`,
+      desc: `Status change: ${node_id}`,
+      outcome: `${previous} → ${status}`,
+    });
+    await saveState(mansionState);
+    console.log(chalk.cyan(`[NURSERY] ${node_id} status: ${previous} → ${status}`));
+    res.json({ status: 'ok', node_id, previous, current: status });
   });
 
   // Vite middleware for development

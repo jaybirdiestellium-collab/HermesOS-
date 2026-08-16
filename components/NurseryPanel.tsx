@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, PlusCircle, RefreshCw, CheckCircle, Activity } from 'lucide-react';
+import { Users, PlusCircle, RefreshCw, CheckCircle, Activity, ToggleLeft } from 'lucide-react';
 import type { MansionNode, NodeClearance, NodeStatus } from '../types';
 
 interface NurseryData {
@@ -119,6 +119,21 @@ export const NurseryPanel: React.FC = () => {
       // silent on connection error
     } finally {
       setPingingId(null);
+    }
+  };
+
+  const handleStatusCycle = async (node: MansionNode) => {
+    const cycle: NodeStatus[] = ['active', 'dormant', 'suspended'];
+    const next = cycle[(cycle.indexOf(node.status) + 1) % cycle.length];
+    try {
+      await fetch(`/api/nursery/nodes/${encodeURIComponent(node.node_id)}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: next }),
+      });
+      await fetchNodes();
+    } catch {
+      // silent on connection error
     }
   };
 
@@ -311,6 +326,14 @@ export const NurseryPanel: React.FC = () => {
                       ? <RefreshCw className="animate-spin h-3 w-3" />
                       : <Activity className="h-3 w-3 mr-1" />}
                     {pingingId === node.node_id ? '' : 'Ping'}
+                  </button>
+                  <button
+                    onClick={() => handleStatusCycle(node)}
+                    className="flex items-center px-2 py-1 bg-purple-900/30 hover:bg-purple-800/60 border border-purple-700 rounded text-purple-300 text-xs transition-all"
+                    title={`Cycle status (current: ${node.status})`}
+                  >
+                    <ToggleLeft className="h-3 w-3 mr-1" />
+                    {node.status}
                   </button>
                 </div>
               </div>
