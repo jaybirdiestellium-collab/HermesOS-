@@ -99,7 +99,7 @@ export const RemoteWitnessPanel: React.FC = () => {
         <p className="text-purple-200 text-xs mt-1">
           Perimeter <span className="text-emerald-400">{status.perimeter}</span>
           {' · '}
-          Phase 4 <span className="text-emerald-400">{status.phase}</span>
+          Phase <span className="text-emerald-400">{status.phase}</span>
         </p>
         <p className="text-purple-400 text-xs mt-1">
           Ritual: <span className="text-purple-200">{status.ritual_mode}</span>
