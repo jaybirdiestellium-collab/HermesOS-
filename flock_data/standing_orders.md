@@ -27,7 +27,9 @@
 ## Agent Coordination
 
 - File-based handoffs only
-- Read `copilot_handoff_latest.md` at boot for current state
+- Read `copilot_identity_canonical.json` at boot for canonical identity layer
+- Read `copilot_handoff_latest.json` at boot for machine-readable continuity state
+- Read `copilot_handoff_latest.md` at boot for human-readable session summary
 - Copilot boot: `--add-dir HermesOS --add-dir MansionOS --add-dir OneDrive`
 
 ## Priorities (current)

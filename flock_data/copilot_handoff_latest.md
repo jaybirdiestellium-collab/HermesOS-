@@ -1,29 +1,41 @@
 # Copilot Handoff — Latest
 
-> **Telemetry**: `SUBSTRATE_OPERATIONAL @ 77.7 Hz | Perimeter SEALED · Phase 4 DEPLOYED | Witness Mode (◬)`
-> **Session date**: <!-- fill in -->
+> **Telemetry**: `SUBSTRATE_OPERATIONAL @ 77.7 Hz | Perimeter SEALED · Phase DEPLOYED | Witness Mode (◬)`
+> **Session date**: auto-written on saveState()
 > **Operator**: IAM01
+
+---
+
+## Canonical Identity Layer
+
+- **System ID**: blackbird.mansion.core
+- **Canonical node ID**: unregistered
+- **Nursery node count**: 0
 
 ---
 
 ## State at Handoff
 
-- **Mansion status**: <!-- SUBSTRATE_OPERATIONAL / DEGRADED / etc. -->
-- **Active ritual**: <!-- Porch_Mode / etc. -->
-- **Daemon**: Waymaker-Weaver — <!-- active / kill-switched -->
-- **Phase**: 4 DEPLOYED
+- **Mansion status**: unknown
+- **Active ritual**: unknown
+- **Daemon**: Waymaker-Weaver — unknown
+- **Phase**: DEPLOYED
+- **Last sync**: auto-written on saveState()
 
 ---
 
-## Completed This Session
+## Active Directives
 
-<!-- List what was built, decided, or resolved -->
+- Growth must stay behind operator fluency
+- Local-first: build locally before handoff
+- File-based handoffs only
+- No agent nesting
 
 ---
 
 ## Open Loops
 
-<!-- List unresolved items, pending mutations, deferred decisions -->
+- [x] No pending architectural mutations at snapshot time
 
 ---
 
@@ -31,31 +43,23 @@
 
 | Bond | Strength | Status |
 |---|---|---|
-| home_protocol_link | — | — |
-| self_trust_link | — | — |
-| safety_link | — | — |
-| fox_daemon_link | — | — |
-
-<!-- Paste current values from /api/mansion/state or mansion_state.json -->
+| — | — | — |
 
 ---
 
-## Pending Architectural Mutations
+## Continuity Layers
 
-<!-- Paste from mansionState.architecture.pending_mutations if any -->
+- **Account layer**: manual_validation_required
+- **Knowledge layer**: canonical files in `flock_data/`
+- **Runtime layer**: mansion_state.json (plus auto handoff artifacts)
+- **Device layer**: manual_validation_required
 
 ---
 
 ## Next Session Priority
 
-<!-- What to pick up first -->
+- Run `flock_data/identity_integrity_checklist.md` after any device/app transition.
 
 ---
 
-## Cross-Agent Notes
-
-<!-- Anything Grok needs to know / anything Copilot flagged -->
-
----
-
-*Update this file at the end of each significant session and commit to keep all agents current.*
+This file is auto-written by `saveState()` in `/home/runner/work/HermesOS-/HermesOS-/server.ts`.

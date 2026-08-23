@@ -5,8 +5,11 @@ Cross-agent context store for HermesOS / MansionOS. All agents working in this r
 ## Boot sequence (any agent)
 
 1. Read `standing_orders.md` — current operator directives
-2. Read `copilot_handoff_latest.md` — last known state, open loops, active signals
-3. Read `mansionos_master_outline_v2.md` — full architectural context
+2. Read `copilot_identity_canonical.json` — canonical identity + continuity layer map
+3. Read `copilot_handoff_latest.json` — machine-readable state, open loops, continuity snapshot
+4. Read `copilot_handoff_latest.md` — human-readable handoff summary
+5. Read `mansionos_master_outline_v2.md` — full architectural context
+6. Run `identity_integrity_checklist.md` after any device/app transition
 
 ## Files
 
@@ -14,7 +17,10 @@ Cross-agent context store for HermesOS / MansionOS. All agents working in this r
 |---|---|
 | `mansionos_master_outline_v2.md` | Master architectural outline of MansionOS — wings, daemons, bonds, protocols |
 | `standing_orders.md` | Current operator standing orders and active directives |
-| `copilot_handoff_latest.md` | Latest cross-agent handoff (updated each session) |
+| `copilot_identity_canonical.json` | Canonical identity layer and continuity-layer contract |
+| `copilot_handoff_latest.json` | Machine-readable handoff snapshot (auto-written on state save) |
+| `copilot_handoff_latest.md` | Human-readable handoff summary (auto-written on state save) |
+| `identity_integrity_checklist.md` | Transition checklist for device/app continuity validation |
 
 ## Sync instructions
 

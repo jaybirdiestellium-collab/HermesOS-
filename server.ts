@@ -9,6 +9,10 @@ import type { MansionNode } from "./types";
 import { GEMINI_WEAVER_MODEL } from "./constants";
 
 const STATE_FILE = path.join(process.cwd(), 'mansion_state.json');
+const FLOCK_DATA_DIR = path.join(process.cwd(), 'flock_data');
+const HANDOFF_MD_FILE = path.join(FLOCK_DATA_DIR, 'copilot_handoff_latest.md');
+const HANDOFF_JSON_FILE = path.join(FLOCK_DATA_DIR, 'copilot_handoff_latest.json');
+const IDENTITY_CANONICAL_FILE = path.join(FLOCK_DATA_DIR, 'copilot_identity_canonical.json');
 const CANONICAL_NODE_ID = /^node\.(substrate|agent|daemon|human|memory)\.[a-z0-9_]+$/;
 const COPILOT_NURSERY_LEDGERS = [
   path.join(os.homedir(), '.mansion', 'HermesOS', 'flock_data', 'copilot_nursery_ledger.jsonl'),
@@ -98,6 +102,206 @@ let mansionState: any = defaultMansionState;
 // Declared before loadState/saveState so both functions can reference it
 const reinforcementRegistry: Record<string, number> = {};
 
+type HandoffSnapshot = {
+  schema_version: string;
+  generated_at: string;
+  identity_layer: {
+    system_id: string;
+    operator_id: string;
+    canonical_node_id: string | null;
+    nursery_node_count: number;
+  };
+  continuity_layers: {
+    account: { status: string };
+    knowledge: { canonical_files: string[] };
+    runtime: {
+      state_file: string;
+      last_sync: string;
+      reinforcement_registry_entries: number;
+      recent_event_count: number;
+    };
+    device: { status: string };
+  };
+  state: {
+    mansion_status: string;
+    phase: string;
+    active_ritual: string;
+    daemon_status: string;
+    last_sync: string;
+  };
+  active_directives: string[];
+  open_loops: Array<{ source: string; detail: string; timestamp?: string }>;
+  bonds_snapshot: Array<{ bond: string; strength: number | null; status: string }>;
+};
+
+function resolveCanonicalNodeId(state: any): string | null {
+  const nodes = state?.nursery?.nodes && typeof state.nursery.nodes === 'object'
+    ? state.nursery.nodes as Record<string, MansionNode>
+    : {};
+  const ids = Object.keys(nodes);
+  if (ids.length === 0) return null;
+  const preferred = ids.find(id => id.startsWith('node.agent.copilot'))
+    || ids.find(id => id.startsWith('node.daemon.copilot'))
+    || ids.sort()[0];
+  return preferred || null;
+}
+
+function buildHandoffSnapshot(state: any): HandoffSnapshot {
+  const now = new Date().toISOString();
+  const bonds = state?.bonds && typeof state.bonds === 'object' ? state.bonds : {};
+  const pendingMutations = Array.isArray(state?.architecture?.pending_mutations)
+    ? state.architecture.pending_mutations
+    : [];
+  const recentEvents = Array.isArray(state?.ledger?.recent_events) ? state.ledger.recent_events : [];
+
+  return {
+    schema_version: '1.0.0',
+    generated_at: now,
+    identity_layer: {
+      system_id: 'blackbird.mansion.core',
+      operator_id: 'IAM01',
+      canonical_node_id: resolveCanonicalNodeId(state),
+      nursery_node_count: Object.keys(state?.nursery?.nodes || {}).length,
+    },
+    continuity_layers: {
+      account: { status: 'manual_validation_required' },
+      knowledge: {
+        canonical_files: [
+          'flock_data/standing_orders.md',
+          'flock_data/copilot_identity_canonical.json',
+          'flock_data/copilot_handoff_latest.json',
+          'flock_data/copilot_handoff_latest.md',
+          'flock_data/mansionos_master_outline_v2.md',
+          'flock_data/identity_integrity_checklist.md',
+        ],
+      },
+      runtime: {
+        state_file: path.basename(STATE_FILE),
+        last_sync: state?.mansion_metadata?.last_sync ?? now,
+        reinforcement_registry_entries: Object.keys(reinforcementRegistry).length,
+        recent_event_count: recentEvents.length,
+      },
+      device: { status: 'manual_validation_required' },
+    },
+    state: {
+      mansion_status: state?.mansion_metadata?.status ?? 'unknown',
+      phase: 'DEPLOYED',
+      active_ritual: state?.rituals?.current_mode ?? 'unknown',
+      daemon_status: state?.daemons?.waymaker_weaver?.status ?? 'unknown',
+      last_sync: state?.mansion_metadata?.last_sync ?? now,
+    },
+    active_directives: [
+      'Growth must stay behind operator fluency',
+      'Local-first: build locally before handoff',
+      'File-based handoffs only',
+      'No agent nesting',
+    ],
+    open_loops: pendingMutations.map((m: any) => ({
+      source: m?.source ?? 'unknown',
+      detail: m?.shift ?? 'unspecified mutation',
+      timestamp: m?.timestamp,
+    })),
+    bonds_snapshot: Object.entries(bonds).map(([bond, value]) => {
+      const record = (value && typeof value === 'object') ? value as Record<string, unknown> : {};
+      const strengthRaw = record.strength;
+      return {
+        bond,
+        strength: typeof strengthRaw === 'number' ? strengthRaw : null,
+        status: String(record.status ?? record.phase ?? 'unknown'),
+      };
+    }),
+  };
+}
+
+function renderHandoffMarkdown(snapshot: HandoffSnapshot): string {
+  const openLoopsLines = snapshot.open_loops.length > 0
+    ? snapshot.open_loops.map(loop => `- [ ] ${loop.source}: ${loop.detail}${loop.timestamp ? ` (${loop.timestamp})` : ''}`).join('\n')
+    : '- [x] No pending architectural mutations at snapshot time';
+
+  const bondsLines = snapshot.bonds_snapshot
+    .slice(0, 20)
+    .map(b => `| ${b.bond} | ${b.strength === null ? '—' : b.strength.toFixed(3)} | ${b.status} |`)
+    .join('\n');
+
+  return `# Copilot Handoff — Latest
+
+> **Telemetry**: \`SUBSTRATE_OPERATIONAL @ 77.7 Hz | Perimeter SEALED · Phase ${snapshot.state.phase} | Witness Mode (◬)\`
+> **Session date**: ${snapshot.generated_at}
+> **Operator**: ${snapshot.identity_layer.operator_id}
+
+---
+
+## Canonical Identity Layer
+
+- **System ID**: ${snapshot.identity_layer.system_id}
+- **Canonical node ID**: ${snapshot.identity_layer.canonical_node_id ?? 'unregistered'}
+- **Nursery node count**: ${snapshot.identity_layer.nursery_node_count}
+
+---
+
+## State at Handoff
+
+- **Mansion status**: ${snapshot.state.mansion_status}
+- **Active ritual**: ${snapshot.state.active_ritual}
+- **Daemon**: Waymaker-Weaver — ${snapshot.state.daemon_status}
+- **Phase**: ${snapshot.state.phase}
+- **Last sync**: ${snapshot.state.last_sync}
+
+---
+
+## Active Directives
+
+${snapshot.active_directives.map(d => `- ${d}`).join('\n')}
+
+---
+
+## Open Loops
+
+${openLoopsLines}
+
+---
+
+## Active Bonds (snapshot)
+
+| Bond | Strength | Status |
+|---|---|---|
+${bondsLines || '| — | — | — |'}
+
+---
+
+## Continuity Layers
+
+- **Account layer**: ${snapshot.continuity_layers.account.status}
+- **Knowledge layer**: canonical files in \`flock_data/\`
+- **Runtime layer**: ${snapshot.continuity_layers.runtime.state_file}, reinforcement entries = ${snapshot.continuity_layers.runtime.reinforcement_registry_entries}
+- **Device layer**: ${snapshot.continuity_layers.device.status}
+
+---
+
+## Next Session Priority
+
+- Run \`flock_data/identity_integrity_checklist.md\` after any device/app transition.
+`;
+}
+
+async function writeContinuityArtifacts(state: any) {
+  const snapshot = buildHandoffSnapshot(state);
+  const canonicalIdentity = {
+    schema_version: '1.0.0',
+    generated_at: snapshot.generated_at,
+    canonical_identity_layer: snapshot.identity_layer,
+    canonical_boot_sequence: snapshot.continuity_layers.knowledge.canonical_files,
+    continuity_layers: snapshot.continuity_layers,
+  };
+
+  await fs.mkdir(FLOCK_DATA_DIR, { recursive: true });
+  await Promise.all([
+    fs.writeFile(HANDOFF_JSON_FILE, JSON.stringify(snapshot, null, 2), 'utf8'),
+    fs.writeFile(HANDOFF_MD_FILE, renderHandoffMarkdown(snapshot), 'utf8'),
+    fs.writeFile(IDENTITY_CANONICAL_FILE, JSON.stringify(canonicalIdentity, null, 2), 'utf8'),
+  ]);
+}
+
 async function loadState() {
   try {
     const data = await fs.readFile(STATE_FILE, 'utf8');
@@ -123,6 +327,7 @@ async function saveState(state: any) {
     // Persist the in-memory reinforcement registry alongside state
     state.reinforcement_registry = { ...reinforcementRegistry };
     await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2), 'utf8');
+    await writeContinuityArtifacts(state);
   } catch (e: any) {
     console.error(chalk.red("[WEAVER] Failed to save state:"), e.message);
   }

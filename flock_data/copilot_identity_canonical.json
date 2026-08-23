@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "auto-written on saveState()",
+  "canonical_identity_layer": {
+    "system_id": "blackbird.mansion.core",
+    "operator_id": "IAM01",
+    "canonical_node_id": null,
+    "nursery_node_count": 0
+  },
+  "canonical_boot_sequence": [
+    "flock_data/standing_orders.md",
+    "flock_data/copilot_identity_canonical.json",
+    "flock_data/copilot_handoff_latest.json",
+    "flock_data/copilot_handoff_latest.md",
+    "flock_data/mansionos_master_outline_v2.md",
+    "flock_data/identity_integrity_checklist.md"
+  ],
+  "continuity_layers": {
+    "account": {
+      "status": "manual_validation_required"
+    },
+    "knowledge": {
+      "canonical_files": [
+        "flock_data/standing_orders.md",
+        "flock_data/copilot_identity_canonical.json",
+        "flock_data/copilot_handoff_latest.json",
+        "flock_data/copilot_handoff_latest.md",
+        "flock_data/mansionos_master_outline_v2.md",
+        "flock_data/identity_integrity_checklist.md"
+      ]
+    },
+    "runtime": {
+      "state_file": "mansion_state.json",
+      "last_sync": "auto-written on saveState()",
+      "reinforcement_registry_entries": 0,
+      "recent_event_count": 0
+    },
+    "device": {
+      "status": "manual_validation_required"
+    }
+  }
+}
