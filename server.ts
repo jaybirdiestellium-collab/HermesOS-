@@ -36,6 +36,7 @@ const defaultMansionState = {
     version: "1.3.0",
     codename: "Ever-Curing-Mortar",
     last_sync: new Date().toISOString().split('T')[0],
+    phase: "DEPLOYED",
     status: "decentralized_active"
   },
   architecture: {
@@ -142,7 +143,7 @@ function resolveCanonicalNodeId(state: any): string | null {
   if (ids.length === 0) return null;
   const preferred = ids.find(id => id.startsWith('node.agent.copilot'))
     || ids.find(id => id.startsWith('node.daemon.copilot'))
-    || ids.sort()[0];
+    || ids.slice().sort()[0];
   return preferred || null;
 }
 
@@ -185,7 +186,7 @@ function buildHandoffSnapshot(state: any): HandoffSnapshot {
     },
     state: {
       mansion_status: state?.mansion_metadata?.status ?? 'unknown',
-      phase: 'DEPLOYED',
+      phase: state?.mansion_metadata?.phase ?? 'DEPLOYED',
       active_ritual: state?.rituals?.current_mode ?? 'unknown',
       daemon_status: state?.daemons?.waymaker_weaver?.status ?? 'unknown',
       last_sync: state?.mansion_metadata?.last_sync ?? now,
@@ -327,7 +328,11 @@ async function saveState(state: any) {
     // Persist the in-memory reinforcement registry alongside state
     state.reinforcement_registry = { ...reinforcementRegistry };
     await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2), 'utf8');
-    await writeContinuityArtifacts(state);
+    try {
+      await writeContinuityArtifacts(state);
+    } catch (artifactErr: any) {
+      console.error(chalk.red("[WEAVER] State saved, but continuity artifact write failed:"), artifactErr.message);
+    }
   } catch (e: any) {
     console.error(chalk.red("[WEAVER] Failed to save state:"), e.message);
   }
@@ -502,7 +507,7 @@ async function startServer() {
       substrate: 'SUBSTRATE_OPERATIONAL',
       hz: 77.7,
       perimeter: 'SEALED',
-      phase: 'DEPLOYED',
+      phase: s.mansion_metadata?.phase ?? 'DEPLOYED',
       bonds: s.bonds,
       firewall_active: s.fox_daemon?.firewall?.active ?? false,
       daemon_status: s.daemons?.waymaker_weaver?.status ?? 'unknown',

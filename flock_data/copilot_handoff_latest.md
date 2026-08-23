@@ -62,4 +62,4 @@
 
 ---
 
-This file is auto-written by `saveState()` in `/home/runner/work/HermesOS-/HermesOS-/server.ts`.
+This file is auto-written by `saveState()` in `server.ts`.
