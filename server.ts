@@ -266,16 +266,17 @@ async function writeHandoffArtifacts(state: any) {
 }
 
 async function handoffArtifactsMissing() {
-  try {
-    await Promise.all([
-      fs.access(COPILOT_HANDOFF_MD_FILE),
-      fs.access(COPILOT_HANDOFF_JSON_FILE),
-      fs.access(COPILOT_IDENTITY_FILE),
-    ]);
-    return false;
-  } catch {
-    return true;
+  for (const artifactPath of [COPILOT_HANDOFF_MD_FILE, COPILOT_HANDOFF_JSON_FILE, COPILOT_IDENTITY_FILE]) {
+    try {
+      await fs.access(artifactPath);
+    } catch (error: any) {
+      if (error?.code === 'ENOENT') {
+        return true;
+      }
+      throw error;
+    }
   }
+  return false;
 }
 
 async function writeFileAtomically(filePath: string, content: string) {
