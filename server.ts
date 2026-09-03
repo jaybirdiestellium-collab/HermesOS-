@@ -316,6 +316,7 @@ async function persistFilesAtomically(files: Array<{ path: string; content: stri
         replacedTargets.add(file.path);
       }
     } catch (error) {
+      const rollbackErrors: Error[] = [];
       for (const file of [...stagedFiles].reverse()) {
         if (replacedTargets.has(file.path)) {
           await fs.rm(file.path, { force: true });
@@ -325,11 +326,14 @@ async function persistFilesAtomically(files: Array<{ path: string; content: stri
           await fs.rename(file.backupPath, file.path);
         } catch (backupError: any) {
           if (backupError?.code !== 'ENOENT') {
-            throw backupError;
+            rollbackErrors.push(backupError);
           }
         }
       }
       await fs.rm(stagingDir, { recursive: true, force: true });
+      if (rollbackErrors.length && error instanceof Error) {
+        (error as Error & { rollbackErrors?: Error[] }).rollbackErrors = rollbackErrors;
+      }
       throw error;
     }
 

@@ -26,9 +26,10 @@ This folder mirrors `C:\Users\jamal\HermesOS\flock_data\` on the local machine.
 `copilot_handoff_latest.md`, `copilot_handoff_latest.json`, and `copilot_identity_canonical.json` are generated from `saveState()` and should not be edited by hand.
 
 To keep it current:
-1. After significant local sessions, copy updated files into this folder
-2. Commit + push: `git add flock_data/ && git commit -m "sync: flock_data update" && git push`
-3. Any agent with repo access can then read current context without needing local dirs
+1. Update the source state or standing orders locally, then let `saveState()` regenerate the handoff artifacts
+2. Sync the generated handoff files together as one bundle; do not hand-edit them independently
+3. Commit + push: `git add flock_data/ && git commit -m "sync: flock_data update" && git push`
+4. Any agent with repo access can then read current context without needing local dirs
 
 ## Canonical telemetry line
 
