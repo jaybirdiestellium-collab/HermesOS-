@@ -155,9 +155,11 @@ function buildHandoffSnapshot(state: any) {
 function buildHandoffMarkdown(snapshot: ReturnType<typeof buildHandoffSnapshot>) {
   const completedLines = snapshot.completed_this_session.map((item: string) => `- ${item}`).join('\n');
   const openLoopLines = snapshot.open_loops.map((item: string) => `- ${item}`).join('\n');
-  const bondRows = snapshot.active_bonds_snapshot
-    .map((bond: any) => `| ${bond.bond} | ${bond.strength ?? '—'} | ${bond.status} |`)
-    .join('\n');
+  const bondRows = snapshot.active_bonds_snapshot.length
+    ? snapshot.active_bonds_snapshot
+        .map((bond: any) => `| ${bond.bond} | ${bond.strength ?? '—'} | ${bond.status} |`)
+        .join('\n')
+    : '| none_recorded | — | unknown |';
   const mutationLines = snapshot.pending_architectural_mutations.length
     ? snapshot.pending_architectural_mutations
         .map((mutation: any) => `- ${mutation.shift || 'Unnamed mutation'}${mutation.source ? ` (${mutation.source})` : ''}`)
@@ -259,6 +261,19 @@ async function writeHandoffArtifacts(state: any) {
   ]);
 }
 
+async function handoffArtifactsMissing() {
+  try {
+    await Promise.all([
+      fs.access(COPILOT_HANDOFF_MD_FILE),
+      fs.access(COPILOT_HANDOFF_JSON_FILE),
+      fs.access(COPILOT_IDENTITY_FILE),
+    ]);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 async function loadState() {
   try {
     const data = await fs.readFile(STATE_FILE, 'utf8');
@@ -312,7 +327,9 @@ function calculateBond(memId: string, memoryA: string, memoryB: string) {
 
 async function startServer() {
   mansionState = await loadState();
-  await writeHandoffArtifacts(mansionState);
+  if (await handoffArtifactsMissing()) {
+    await writeHandoffArtifacts(mansionState);
+  }
   const app = express();
   const PORT = 3000;
 
