@@ -8,7 +8,7 @@ Cross-agent context store for HermesOS / MansionOS. All agents working in this r
 2. Read `copilot_handoff_latest.md` — last known state, open loops, active signals
 3. Use `copilot_handoff_latest.json` when a structured mirror of that snapshot is needed
 4. Use `copilot_identity_canonical.json` for stable Copilot boot/handoff metadata
-3. Read `mansionos_master_outline_v2.md` — full architectural context
+5. Read `mansionos_master_outline_v2.md` — full architectural context
 
 ## Files
 

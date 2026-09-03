@@ -312,7 +312,7 @@ function calculateBond(memId: string, memoryA: string, memoryB: string) {
 
 async function startServer() {
   mansionState = await loadState();
-  await saveState(mansionState);
+  await writeHandoffArtifacts(mansionState);
   const app = express();
   const PORT = 3000;
 
