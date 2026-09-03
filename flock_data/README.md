@@ -6,6 +6,8 @@ Cross-agent context store for HermesOS / MansionOS. All agents working in this r
 
 1. Read `standing_orders.md` — current operator directives
 2. Read `copilot_handoff_latest.md` — last known state, open loops, active signals
+3. Use `copilot_handoff_latest.json` when a structured mirror of that snapshot is needed
+4. Use `copilot_identity_canonical.json` for stable Copilot boot/handoff metadata
 3. Read `mansionos_master_outline_v2.md` — full architectural context
 
 ## Files
@@ -14,7 +16,9 @@ Cross-agent context store for HermesOS / MansionOS. All agents working in this r
 |---|---|
 | `mansionos_master_outline_v2.md` | Master architectural outline of MansionOS — wings, daemons, bonds, protocols |
 | `standing_orders.md` | Current operator standing orders and active directives |
-| `copilot_handoff_latest.md` | Latest cross-agent handoff (updated each session) |
+| `copilot_handoff_latest.md` | Latest Grok ↔ Copilot handoff snapshot in markdown |
+| `copilot_handoff_latest.json` | Structured mirror of the latest handoff snapshot |
+| `copilot_identity_canonical.json` | Canonical Copilot identity + handoff protocol metadata |
 
 ## Sync instructions
 

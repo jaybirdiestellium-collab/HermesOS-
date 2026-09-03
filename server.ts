@@ -7,6 +7,10 @@ import fs from "fs/promises";
 import type { MansionNode } from "./types";
 
 const STATE_FILE = path.join(process.cwd(), 'mansion_state.json');
+const FLOCK_DATA_DIR = path.join(process.cwd(), 'flock_data');
+const COPILOT_HANDOFF_MD_FILE = path.join(FLOCK_DATA_DIR, 'copilot_handoff_latest.md');
+const COPILOT_HANDOFF_JSON_FILE = path.join(FLOCK_DATA_DIR, 'copilot_handoff_latest.json');
+const COPILOT_IDENTITY_FILE = path.join(FLOCK_DATA_DIR, 'copilot_identity_canonical.json');
 const CANONICAL_NODE_ID = /^node\.(substrate|agent|daemon|human|memory)\.[a-z0-9_]+$/;
 const COPILOT_NURSERY_LEDGERS = [
   path.join(os.homedir(), '.mansion', 'HermesOS', 'flock_data', 'copilot_nursery_ledger.jsonl'),
@@ -90,6 +94,171 @@ const defaultMansionState = {
 
 let mansionState: any = defaultMansionState;
 
+function getTelemetryLine(state: any) {
+  const phase = state?.mansion_metadata?.status === 'decentralized_active' ? 'Phase 4 DEPLOYED' : 'Phase UNKNOWN';
+  return `SUBSTRATE_OPERATIONAL @ 77.7 Hz | Perimeter SEALED · ${phase} | Witness Mode (◬)`;
+}
+
+function summarizeRecentEvent(event: any) {
+  if (!event) {
+    return 'No recent event recorded';
+  }
+
+  const title = event.title || event.desc || event.type || event.id || 'Unnamed event';
+  const outcome = event.outcome ? ` — ${event.outcome}` : '';
+  return `${title}${outcome}`;
+}
+
+function getPendingMutations(state: any) {
+  const pending = state?.architecture?.pending_mutations;
+  return Array.isArray(pending) ? pending : [];
+}
+
+function buildHandoffSnapshot(state: any) {
+  const daemon = state?.daemons?.waymaker_weaver;
+  const bonds = state?.bonds || {};
+  const pendingMutations = getPendingMutations(state);
+  const recentEvents = Array.isArray(state?.ledger?.recent_events) ? state.ledger.recent_events : [];
+  const completedThisSession = recentEvents.slice(0, 5).map(summarizeRecentEvent);
+  const activeBonds = Object.entries(bonds).map(([bond, details]: [string, any]) => ({
+    bond,
+    strength: typeof details?.strength === 'number' ? Number(details.strength.toFixed(2)) : null,
+    status: details?.status || details?.phase || 'unknown',
+  }));
+  const openLoops = pendingMutations.map((mutation: any) => mutation.shift).filter(Boolean);
+
+  return {
+    generated_at: new Date().toISOString(),
+    operator: 'IAM01',
+    telemetry: getTelemetryLine(state),
+    state_at_handoff: {
+      mansion_status: state?.mansion_metadata?.status || 'unknown',
+      active_ritual: state?.rituals?.current_mode || 'unknown',
+      daemon: {
+        name: daemon?.name || 'Waymaker-Weaver',
+        status: daemon?.kill_switch?.state === 'closed' ? 'kill-switched' : daemon?.status || 'unknown',
+      },
+      phase: '4 DEPLOYED',
+    },
+    completed_this_session: completedThisSession.length ? completedThisSession : ['No completed events recorded yet'],
+    open_loops: openLoops.length ? openLoops : ['No pending mutations recorded'],
+    active_bonds_snapshot: activeBonds,
+    pending_architectural_mutations: pendingMutations,
+    next_session_priority: openLoops[0] || completedThisSession[0] || 'Review state and record the next mutation',
+    cross_agent_notes: [
+      'Canonical file-based handoff for Grok ↔ Copilot continuity.',
+      'Read standing_orders.md first, then this handoff, then mansionos_master_outline_v2.md.',
+    ],
+  };
+}
+
+function buildHandoffMarkdown(snapshot: ReturnType<typeof buildHandoffSnapshot>) {
+  const completedLines = snapshot.completed_this_session.map((item: string) => `- ${item}`).join('\n');
+  const openLoopLines = snapshot.open_loops.map((item: string) => `- ${item}`).join('\n');
+  const bondRows = snapshot.active_bonds_snapshot
+    .map((bond: any) => `| ${bond.bond} | ${bond.strength ?? '—'} | ${bond.status} |`)
+    .join('\n');
+  const mutationLines = snapshot.pending_architectural_mutations.length
+    ? snapshot.pending_architectural_mutations
+        .map((mutation: any) => `- ${mutation.shift || 'Unnamed mutation'}${mutation.source ? ` (${mutation.source})` : ''}`)
+        .join('\n')
+    : '- None recorded';
+  const crossAgentNotes = snapshot.cross_agent_notes.map((item: string) => `- ${item}`).join('\n');
+
+  return `# Copilot Handoff — Latest
+
+> **Telemetry**: \`${snapshot.telemetry}\`
+> **Session date**: ${snapshot.generated_at}
+> **Operator**: ${snapshot.operator}
+> **Generated from**: \`mansion_state.json\`
+
+---
+
+## State at Handoff
+
+- **Mansion status**: ${snapshot.state_at_handoff.mansion_status}
+- **Active ritual**: ${snapshot.state_at_handoff.active_ritual}
+- **Daemon**: ${snapshot.state_at_handoff.daemon.name} — ${snapshot.state_at_handoff.daemon.status}
+- **Phase**: ${snapshot.state_at_handoff.phase}
+
+---
+
+## Completed This Session
+
+${completedLines}
+
+---
+
+## Open Loops
+
+${openLoopLines}
+
+---
+
+## Active Bonds (snapshot)
+
+| Bond | Strength | Status |
+|---|---|---|
+${bondRows}
+
+---
+
+## Pending Architectural Mutations
+
+${mutationLines}
+
+---
+
+## Next Session Priority
+
+- ${snapshot.next_session_priority}
+
+---
+
+## Cross-Agent Notes
+
+${crossAgentNotes}
+
+---
+
+*Auto-generated by saveState() so Grok and Copilot read the same state snapshot.*
+`;
+}
+
+function buildCanonicalIdentity(snapshot: ReturnType<typeof buildHandoffSnapshot>) {
+  return {
+    agent: 'Copilot',
+    operator: snapshot.operator,
+    repository: path.basename(process.cwd()),
+    canonical_boot_sequence: [
+      'flock_data/standing_orders.md',
+      'flock_data/copilot_handoff_latest.md',
+      'flock_data/mansionos_master_outline_v2.md',
+    ],
+    handoff_protocol: {
+      mode: 'file-based',
+      markdown: 'flock_data/copilot_handoff_latest.md',
+      json: 'flock_data/copilot_handoff_latest.json',
+      identity: 'flock_data/copilot_identity_canonical.json',
+      peers: ['Grok', 'Copilot'],
+    },
+    telemetry: snapshot.telemetry,
+  };
+}
+
+async function writeHandoffArtifacts(state: any) {
+  const snapshot = buildHandoffSnapshot(state);
+  const markdown = buildHandoffMarkdown(snapshot);
+  const identity = buildCanonicalIdentity(snapshot);
+
+  await fs.mkdir(FLOCK_DATA_DIR, { recursive: true });
+  await Promise.all([
+    fs.writeFile(COPILOT_HANDOFF_MD_FILE, markdown, 'utf8'),
+    fs.writeFile(COPILOT_HANDOFF_JSON_FILE, JSON.stringify(snapshot, null, 2), 'utf8'),
+    fs.writeFile(COPILOT_IDENTITY_FILE, JSON.stringify(identity, null, 2), 'utf8'),
+  ]);
+}
+
 async function loadState() {
   try {
     const data = await fs.readFile(STATE_FILE, 'utf8');
@@ -104,6 +273,7 @@ async function loadState() {
 async function saveState(state: any) {
   try {
     await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2), 'utf8');
+    await writeHandoffArtifacts(state);
   } catch (e: any) {
     console.error(chalk.red("[WEAVER] Failed to save state:"), e.message);
   }
@@ -142,6 +312,7 @@ function calculateBond(memId: string, memoryA: string, memoryB: string) {
 
 async function startServer() {
   mansionState = await loadState();
+  await saveState(mansionState);
   const app = express();
   const PORT = 3000;
 

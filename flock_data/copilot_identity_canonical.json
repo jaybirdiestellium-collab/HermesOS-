@@ -1,0 +1,21 @@
+{
+  "agent": "Copilot",
+  "operator": "IAM01",
+  "repository": "HermesOS-",
+  "canonical_boot_sequence": [
+    "flock_data/standing_orders.md",
+    "flock_data/copilot_handoff_latest.md",
+    "flock_data/mansionos_master_outline_v2.md"
+  ],
+  "handoff_protocol": {
+    "mode": "file-based",
+    "markdown": "flock_data/copilot_handoff_latest.md",
+    "json": "flock_data/copilot_handoff_latest.json",
+    "identity": "flock_data/copilot_identity_canonical.json",
+    "peers": [
+      "Grok",
+      "Copilot"
+    ]
+  },
+  "telemetry": "SUBSTRATE_OPERATIONAL @ 77.7 Hz | Perimeter SEALED · Phase 4 DEPLOYED | Witness Mode (◬)"
+}

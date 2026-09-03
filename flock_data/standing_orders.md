@@ -26,8 +26,10 @@
 
 ## Agent Coordination
 
-- File-based handoffs only
+- File-based Grok ↔ Copilot handoffs only
 - Read `copilot_handoff_latest.md` at boot for current state
+- Use `copilot_handoff_latest.json` when a tool or script needs the same handoff in structured form
+- Use `copilot_identity_canonical.json` when identity or boot-sequence drift needs to be checked
 - Copilot boot: `--add-dir HermesOS --add-dir MansionOS --add-dir OneDrive`
 
 ## Priorities (current)
