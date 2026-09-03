@@ -256,13 +256,13 @@ async function writeHandoffArtifacts(state: any) {
   const snapshot = buildHandoffSnapshot(state);
   const markdown = buildHandoffMarkdown(snapshot);
   const identity = buildCanonicalIdentity(snapshot);
+  const serializedSnapshot = JSON.stringify(snapshot, null, 2);
+  const serializedIdentity = JSON.stringify(identity, null, 2);
 
   await fs.mkdir(FLOCK_DATA_DIR, { recursive: true });
-  await Promise.all([
-    fs.writeFile(COPILOT_HANDOFF_MD_FILE, markdown, 'utf8'),
-    fs.writeFile(COPILOT_HANDOFF_JSON_FILE, JSON.stringify(snapshot, null, 2), 'utf8'),
-    fs.writeFile(COPILOT_IDENTITY_FILE, JSON.stringify(identity, null, 2), 'utf8'),
-  ]);
+  await writeFileAtomically(COPILOT_HANDOFF_MD_FILE, markdown);
+  await writeFileAtomically(COPILOT_HANDOFF_JSON_FILE, serializedSnapshot);
+  await writeFileAtomically(COPILOT_IDENTITY_FILE, serializedIdentity);
 }
 
 async function handoffArtifactsMissing() {
@@ -276,6 +276,12 @@ async function handoffArtifactsMissing() {
   } catch {
     return true;
   }
+}
+
+async function writeFileAtomically(filePath: string, content: string) {
+  const tempPath = `${filePath}.tmp`;
+  await fs.writeFile(tempPath, content, 'utf8');
+  await fs.rename(tempPath, filePath);
 }
 
 async function loadState() {
