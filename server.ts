@@ -93,6 +93,7 @@ const defaultMansionState = {
 };
 
 let mansionState: any = defaultMansionState;
+let stateWriteQueue: Promise<void> = Promise.resolve();
 
 function getTelemetryLine(state: any) {
   const phase = getPhaseLabel(state);
@@ -267,7 +268,7 @@ async function handoffArtifactsNeedRefresh(state: any) {
   for (const artifact of buildHandoffArtifactFiles(state)) {
     try {
       const currentContent = await fs.readFile(artifact.path, 'utf8');
-      if (currentContent !== artifact.content) {
+      if (!handoffArtifactMatches(artifact.path, currentContent, artifact.content)) {
         return true;
       }
     } catch (error: any) {
@@ -281,61 +282,91 @@ async function handoffArtifactsNeedRefresh(state: any) {
 }
 
 async function persistFilesAtomically(files: Array<{ path: string; content: string }>) {
-  const stagingDir = await fs.mkdtemp(path.join(process.cwd(), '.state-sync-'));
-  const stagedFiles = files.map((file, index) => ({
-    ...file,
-    stagedPath: path.join(stagingDir, `${index}.staged`),
-    backupPath: path.join(stagingDir, `${index}.backup`),
-  }));
-  const replacedTargets = new Set<string>();
+  await withStateWriteLock(async () => {
+    const stagingDir = await fs.mkdtemp(path.join(process.cwd(), '.state-sync-'));
+    const stagedFiles = files.map((file, index) => ({
+      ...file,
+      stagedPath: path.join(stagingDir, `${index}.staged`),
+      backupPath: path.join(stagingDir, `${index}.backup`),
+    }));
+    const replacedTargets = new Set<string>();
 
-  try {
-    for (const dir of new Set(files.map(file => path.dirname(file.path)))) {
-      await fs.mkdir(dir, { recursive: true });
-    }
+    try {
+      for (const dir of new Set(files.map(file => path.dirname(file.path)))) {
+        await fs.mkdir(dir, { recursive: true });
+      }
 
-    for (const file of stagedFiles) {
-      await fs.writeFile(file.stagedPath, file.content, 'utf8');
-    }
+      for (const file of stagedFiles) {
+        await fs.writeFile(file.stagedPath, file.content, 'utf8');
+      }
 
-    for (const file of stagedFiles) {
-      try {
-        await fs.access(file.path);
-        await fs.rename(file.path, file.backupPath);
-      } catch (error: any) {
-        if (error?.code !== 'ENOENT') {
-          throw error;
+      for (const file of stagedFiles) {
+        try {
+          await fs.access(file.path);
+          await fs.rename(file.path, file.backupPath);
+        } catch (error: any) {
+          if (error?.code !== 'ENOENT') {
+            throw error;
+          }
         }
       }
-    }
 
-    for (const file of stagedFiles) {
-      await fs.rename(file.stagedPath, file.path);
-      replacedTargets.add(file.path);
-    }
-  } catch (error) {
-    for (const file of [...stagedFiles].reverse()) {
-      if (replacedTargets.has(file.path)) {
-        await fs.rm(file.path, { force: true });
+      for (const file of stagedFiles) {
+        await fs.rename(file.stagedPath, file.path);
+        replacedTargets.add(file.path);
       }
-      try {
-        await fs.access(file.backupPath);
-        await fs.rename(file.backupPath, file.path);
-      } catch (backupError: any) {
-        if (backupError?.code !== 'ENOENT') {
-          throw backupError;
+    } catch (error) {
+      for (const file of [...stagedFiles].reverse()) {
+        if (replacedTargets.has(file.path)) {
+          await fs.rm(file.path, { force: true });
+        }
+        try {
+          await fs.access(file.backupPath);
+          await fs.rename(file.backupPath, file.path);
+        } catch (backupError: any) {
+          if (backupError?.code !== 'ENOENT') {
+            throw backupError;
+          }
         }
       }
+      await fs.rm(stagingDir, { recursive: true, force: true });
+      throw error;
     }
+
     await fs.rm(stagingDir, { recursive: true, force: true });
-    throw error;
-  }
-
-  await fs.rm(stagingDir, { recursive: true, force: true });
+  });
 }
 
 async function writeHandoffArtifacts(state: any) {
   await persistFilesAtomically(buildHandoffArtifactFiles(state));
+}
+
+function handoffArtifactMatches(filePath: string, currentContent: string, nextContent: string) {
+  if (filePath === COPILOT_HANDOFF_JSON_FILE) {
+    return JSON.stringify(normalizeHandoffJson(JSON.parse(currentContent))) === JSON.stringify(normalizeHandoffJson(JSON.parse(nextContent)));
+  }
+
+  if (filePath === COPILOT_HANDOFF_MD_FILE) {
+    return normalizeHandoffMarkdown(currentContent) === normalizeHandoffMarkdown(nextContent);
+  }
+
+  return currentContent === nextContent;
+}
+
+function normalizeHandoffJson(snapshot: any) {
+  const normalized = { ...snapshot };
+  delete normalized.generated_at;
+  return normalized;
+}
+
+function normalizeHandoffMarkdown(content: string) {
+  return content.replace(/^> \*\*Session date\*\*: .*$/m, '> **Session date**: <generated>');
+}
+
+async function withStateWriteLock<T>(action: () => Promise<T>) {
+  const run = stateWriteQueue.then(action, action);
+  stateWriteQueue = run.then(() => undefined, () => undefined);
+  return run;
 }
 
 async function loadState() {

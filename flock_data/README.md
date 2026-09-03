@@ -23,6 +23,7 @@ Cross-agent context store for HermesOS / MansionOS. All agents working in this r
 ## Sync instructions
 
 This folder mirrors `C:\Users\jamal\HermesOS\flock_data\` on the local machine.
+`copilot_handoff_latest.md`, `copilot_handoff_latest.json`, and `copilot_identity_canonical.json` are generated from `saveState()` and should not be edited by hand.
 
 To keep it current:
 1. After significant local sessions, copy updated files into this folder
