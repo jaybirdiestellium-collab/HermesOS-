@@ -252,23 +252,24 @@ function buildCanonicalIdentity(snapshot: ReturnType<typeof buildHandoffSnapshot
   };
 }
 
-async function writeHandoffArtifacts(state: any) {
+function buildHandoffArtifactFiles(state: any) {
   const snapshot = buildHandoffSnapshot(state);
   const markdown = buildHandoffMarkdown(snapshot);
   const identity = buildCanonicalIdentity(snapshot);
-  const serializedSnapshot = JSON.stringify(snapshot, null, 2);
-  const serializedIdentity = JSON.stringify(identity, null, 2);
-
-  await fs.mkdir(FLOCK_DATA_DIR, { recursive: true });
-  await writeFileAtomically(COPILOT_HANDOFF_MD_FILE, markdown);
-  await writeFileAtomically(COPILOT_HANDOFF_JSON_FILE, serializedSnapshot);
-  await writeFileAtomically(COPILOT_IDENTITY_FILE, serializedIdentity);
+  return [
+    { path: COPILOT_HANDOFF_MD_FILE, content: markdown },
+    { path: COPILOT_HANDOFF_JSON_FILE, content: JSON.stringify(snapshot, null, 2) },
+    { path: COPILOT_IDENTITY_FILE, content: JSON.stringify(identity, null, 2) },
+  ];
 }
 
-async function handoffArtifactsMissing() {
-  for (const artifactPath of [COPILOT_HANDOFF_MD_FILE, COPILOT_HANDOFF_JSON_FILE, COPILOT_IDENTITY_FILE]) {
+async function handoffArtifactsNeedRefresh(state: any) {
+  for (const artifact of buildHandoffArtifactFiles(state)) {
     try {
-      await fs.access(artifactPath);
+      const currentContent = await fs.readFile(artifact.path, 'utf8');
+      if (currentContent !== artifact.content) {
+        return true;
+      }
     } catch (error: any) {
       if (error?.code === 'ENOENT') {
         return true;
@@ -279,15 +280,62 @@ async function handoffArtifactsMissing() {
   return false;
 }
 
-async function writeFileAtomically(filePath: string, content: string) {
-  const tempPath = `${filePath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
-  await fs.writeFile(tempPath, content, 'utf8');
+async function persistFilesAtomically(files: Array<{ path: string; content: string }>) {
+  const stagingDir = await fs.mkdtemp(path.join(process.cwd(), '.state-sync-'));
+  const stagedFiles = files.map((file, index) => ({
+    ...file,
+    stagedPath: path.join(stagingDir, `${index}.staged`),
+    backupPath: path.join(stagingDir, `${index}.backup`),
+  }));
+  const replacedTargets = new Set<string>();
+
   try {
-    await fs.rename(tempPath, filePath);
+    for (const dir of new Set(files.map(file => path.dirname(file.path)))) {
+      await fs.mkdir(dir, { recursive: true });
+    }
+
+    for (const file of stagedFiles) {
+      await fs.writeFile(file.stagedPath, file.content, 'utf8');
+    }
+
+    for (const file of stagedFiles) {
+      try {
+        await fs.access(file.path);
+        await fs.rename(file.path, file.backupPath);
+      } catch (error: any) {
+        if (error?.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+    }
+
+    for (const file of stagedFiles) {
+      await fs.rename(file.stagedPath, file.path);
+      replacedTargets.add(file.path);
+    }
   } catch (error) {
-    await fs.rm(tempPath, { force: true });
+    for (const file of [...stagedFiles].reverse()) {
+      if (replacedTargets.has(file.path)) {
+        await fs.rm(file.path, { force: true });
+      }
+      try {
+        await fs.access(file.backupPath);
+        await fs.rename(file.backupPath, file.path);
+      } catch (backupError: any) {
+        if (backupError?.code !== 'ENOENT') {
+          throw backupError;
+        }
+      }
+    }
+    await fs.rm(stagingDir, { recursive: true, force: true });
     throw error;
   }
+
+  await fs.rm(stagingDir, { recursive: true, force: true });
+}
+
+async function writeHandoffArtifacts(state: any) {
+  await persistFilesAtomically(buildHandoffArtifactFiles(state));
 }
 
 async function loadState() {
@@ -303,8 +351,10 @@ async function loadState() {
 
 async function saveState(state: any) {
   try {
-    await writeFileAtomically(STATE_FILE, JSON.stringify(state, null, 2));
-    await writeHandoffArtifacts(state);
+    await persistFilesAtomically([
+      { path: STATE_FILE, content: JSON.stringify(state, null, 2) },
+      ...buildHandoffArtifactFiles(state),
+    ]);
   } catch (e: any) {
     console.error(chalk.red("[WEAVER] Failed to save state:"), e.message);
   }
@@ -343,7 +393,7 @@ function calculateBond(memId: string, memoryA: string, memoryB: string) {
 
 async function startServer() {
   mansionState = await loadState();
-  if (await handoffArtifactsMissing()) {
+  if (await handoffArtifactsNeedRefresh(mansionState)) {
     await writeHandoffArtifacts(mansionState);
   }
   const app = express();
