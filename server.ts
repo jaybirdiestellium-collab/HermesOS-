@@ -265,7 +265,8 @@ function buildHandoffArtifactFiles(state: any) {
 }
 
 async function handoffArtifactsNeedRefresh(state: any) {
-  for (const artifact of buildHandoffArtifactFiles(state)) {
+  const artifacts = buildHandoffArtifactFiles(state);
+  for (const artifact of artifacts) {
     try {
       const currentContent = await fs.readFile(artifact.path, 'utf8');
       if (!handoffArtifactMatches(artifact.path, currentContent, artifact.content)) {
@@ -347,7 +348,11 @@ async function writeHandoffArtifacts(state: any) {
 
 function handoffArtifactMatches(filePath: string, currentContent: string, nextContent: string) {
   if (filePath === COPILOT_HANDOFF_JSON_FILE) {
-    return JSON.stringify(normalizeHandoffJson(JSON.parse(currentContent))) === JSON.stringify(normalizeHandoffJson(JSON.parse(nextContent)));
+    try {
+      return JSON.stringify(normalizeHandoffJson(JSON.parse(currentContent))) === JSON.stringify(normalizeHandoffJson(JSON.parse(nextContent)));
+    } catch {
+      return false;
+    }
   }
 
   if (filePath === COPILOT_HANDOFF_MD_FILE) {
