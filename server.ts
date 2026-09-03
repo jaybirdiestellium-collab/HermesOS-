@@ -95,8 +95,12 @@ const defaultMansionState = {
 let mansionState: any = defaultMansionState;
 
 function getTelemetryLine(state: any) {
-  const phase = state?.mansion_metadata?.status === 'decentralized_active' ? 'Phase 4 DEPLOYED' : 'Phase UNKNOWN';
+  const phase = getPhaseLabel(state);
   return `SUBSTRATE_OPERATIONAL @ 77.7 Hz | Perimeter SEALED · ${phase} | Witness Mode (◬)`;
+}
+
+function getPhaseLabel(state: any) {
+  return state?.mansion_metadata?.status === 'decentralized_active' ? 'Phase 4 DEPLOYED' : 'Phase UNKNOWN';
 }
 
 function summarizeRecentEvent(event: any) {
@@ -138,7 +142,7 @@ function buildHandoffSnapshot(state: any) {
         name: daemon?.name || 'Waymaker-Weaver',
         status: daemon?.kill_switch?.state === 'closed' ? 'kill-switched' : daemon?.status || 'unknown',
       },
-      phase: '4 DEPLOYED',
+      phase: getPhaseLabel(state).replace('Phase ', ''),
     },
     completed_this_session: completedThisSession.length ? completedThisSession : ['No completed events recorded yet'],
     open_loops: openLoops.length ? openLoops : ['No pending mutations recorded'],
