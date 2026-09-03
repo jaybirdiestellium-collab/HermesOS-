@@ -297,7 +297,7 @@ async function loadState() {
 
 async function saveState(state: any) {
   try {
-    await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2), 'utf8');
+    await writeFileAtomically(STATE_FILE, JSON.stringify(state, null, 2));
     await writeHandoffArtifacts(state);
   } catch (e: any) {
     console.error(chalk.red("[WEAVER] Failed to save state:"), e.message);
